@@ -1,3 +1,4 @@
+(function() {
 const FX = { USD_RUB: 92.4, EUR_RUB: 100.2 };
 
 const SECTORS = {
@@ -55,3 +56,4 @@ function generateHistory(baseValue, months=24, volatility=0.045, trend=0.008){
 // Keep the app usable when index.html is opened directly from the filesystem.
 // (ES modules are blocked by CORS on file:// URLs in most browsers.)
 window.TINVEST_DATA = { MARKET, DEFAULT_HOLDINGS, FX, SECTORS, generateHistory };
+})();
