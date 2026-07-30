@@ -11,12 +11,8 @@ function loadState(){
       return {
         holdings: parsed.holdings || DEFAULT_HOLDINGS,
         transactions: parsed.transactions || genTransactions(DEFAULT_HOLDINGS),
-        watchlist: parsed.watchlist || ['NVDA','BTC','TMOS','SBER'],
-        goals: parsed.goals || [
-          { id:'g1', name:'На квартиру', target:8000000, current:1240000, date:'2028-12-31', icon:'🏠' },
-          { id:'g2', name:'Подушка безопасности', target:600000, current:420000, date:'2025-12-31', icon:'🛟' },
-          { id:'g3', name:'FIRE – 25 млн', target:25000000, current:2870000, date:'2035-06-01', icon:'🔥' },
-        ],
+        watchlist: parsed.watchlist || [],
+        goals: parsed.goals || [],
         settings:{ currency:'RUB', showRUB:true }
       };
     }
@@ -24,12 +20,8 @@ function loadState(){
   return {
     holdings: JSON.parse(JSON.stringify(DEFAULT_HOLDINGS)),
     transactions: genTransactions(DEFAULT_HOLDINGS),
-    watchlist:['NVDA','BTC','TMOS','SBER'],
-    goals:[
-      { id:'g1', name:'На квартиру', target:8000000, current:1240000, date:'2028-12-31', icon:'🏠' },
-      { id:'g2', name:'Подушка безопасности', target:600000, current:420000, date:'2025-12-31', icon:'🛟' },
-      { id:'g3', name:'FIRE – 25 млн', target:25000000, current:2870000, date:'2035-06-01', icon:'🔥' },
-    ],
+    watchlist:[],
+    goals:[],
     settings:{ currency:'RUB', showRUB:true }
   };
 }
@@ -96,6 +88,8 @@ function init(){
   renderNav();
   bindEvents();
   renderAll();
+  updateLivePrices();
+  updateFX();
   // Chartjs
   if(window.Chart){
     Chart.defaults.color='#92a0bd';
@@ -190,13 +184,26 @@ function bindEvents(){
     }
   });
 
-  // holdings deletion
+  // holdings edit/deletion
   $('#holdingsTable')?.addEventListener('click', (e)=>{
     const del = e.target.closest('[data-del-holding]');
     if(del){
       if(confirm('Удалить актив из портфеля?')){
         state.holdings = state.holdings.filter(h=>h.id!==del.dataset.delHolding);
         saveState(); renderAll();
+      }
+    }
+    const edit = e.target.closest('[data-edit-holding]');
+    if(edit){
+      const h = state.holdings.find(x=>x.id===edit.dataset.editHolding);
+      if(h){
+         const newQty = prompt('Новое количество:', h.qty);
+         if(newQty!==null && !isNaN(parseFloat(newQty))) h.qty = parseFloat(newQty);
+         const newAvg = prompt('Новая средняя цена (покупки):', h.avgPrice);
+         if(newAvg!==null && !isNaN(parseFloat(newAvg))) h.avgPrice = parseFloat(newAvg);
+         const newPrice = prompt('Новая текущая цена рынка (для ручного обновления):', h.price);
+         if(newPrice!==null && !isNaN(parseFloat(newPrice))) h.price = parseFloat(newPrice);
+         saveState(); renderAll();
       }
     }
   });
@@ -292,7 +299,12 @@ function renderPortfolio(){
       <td>${h.currency==='USD'? fmt(h.avgPrice,'USD'): fmt(h.avgPrice,'RUB')} → ${h.currency==='USD'? fmt(h.price,'USD'): fmt(h.price,'RUB')}</td>
       <td><b>${fmt(valueRUB,'RUB')}</b><div class="mini muted">${fmt(value,'USD')} • ${weight.toFixed(1)}%</div></td>
       <td><span class="pill ${pnl>=0?'pill-green':'pill-red'}">${fmtPct(pnlPct)}</span><div class="mini muted">${fmt(pnl,'RUB')}</div></td>
-      <td><button class="btn-ghost btn-sm" data-del-holding="${h.id}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border)">✕</button></td>
+      <td>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-ghost btn-sm" data-edit-holding="${h.id}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border)">✎</button>
+          <button class="btn-ghost btn-sm" data-del-holding="${h.id}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border)">✕</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 
@@ -758,7 +770,7 @@ function importData(e){
   reader.readAsText(file);
 }
 function resetData(){
-  if(confirm('Сбросить портфель к демо-данным?')){
+  if(confirm('Удалить все данные портфеля?')){
     localStorage.removeItem(STORAGE_KEY);
     state=loadState();
     location.reload();
@@ -782,3 +794,114 @@ function toast(msg){
 window.app={ toggleWatchlist, openBuyModal };
 
 document.addEventListener('DOMContentLoaded', init);
+
+async function fetchMoexBoard(board) {
+  try {
+    const res = await fetch(`https://iss.moex.com/iss/engines/stock/markets/shares/boards/${board}/securities.json`);
+    if(!res.ok) return {};
+    const data = await res.json();
+    const prices = {};
+    const secIdx = data.marketdata.columns.indexOf('SECID');
+    const lastIdx = data.marketdata.columns.indexOf('LAST');
+    data.marketdata.data.forEach(row => {
+      if(row[lastIdx]) prices[row[secIdx]] = row[lastIdx];
+    });
+    return prices;
+  } catch(e) { return {}; }
+}
+
+async function fetchMoexBonds(board) {
+  try {
+    const res = await fetch(`https://iss.moex.com/iss/engines/stock/markets/bonds/boards/${board}/securities.json`);
+    if(!res.ok) return {};
+    const data = await res.json();
+    const prices = {};
+    const secIdx = data.marketdata.columns.indexOf('SECID');
+    // For bonds, price is often in % of nominal, let's just grab LAST or PREVPRICE
+    const lastIdx = data.marketdata.columns.indexOf('LAST');
+    data.marketdata.data.forEach(row => {
+      if(row[lastIdx]) prices[row[secIdx]] = row[lastIdx]; // Note: Bond price is % of nominal (usually 1000 RUB), so 95.0 = 950 RUB. Handled manually or users type nominal? Usually users track price directly. Let's just give the raw LAST value.
+    });
+    return prices;
+  } catch(e) { return {}; }
+}
+
+async function updateLivePrices() {
+  let updated = false;
+  
+  // MOEX Shares
+  const moexPrices = Object.assign({}, 
+    await fetchMoexBoard('TQBR'), // Russian shares
+    await fetchMoexBoard('TQTF')  // ETFs
+  );
+  
+  // MOEX Bonds
+  const moexBonds = Object.assign({},
+    await fetchMoexBonds('TQOB'), // OFZ
+    await fetchMoexBonds('TQCB')  // Corp bonds
+  );
+
+  const allMoex = { ...moexPrices, ...moexBonds };
+
+  MARKET.forEach(m => {
+     if(allMoex[m.ticker]) { 
+       // If bond, keep as is (often % or raw).
+       m.price = allMoex[m.ticker]; 
+       updated = true; 
+     }
+  });
+  state.holdings.forEach(h => {
+     if(allMoex[h.ticker]) { 
+       h.price = allMoex[h.ticker]; 
+       updated = true; 
+     }
+  });
+  
+  try {
+    const binanceRes = await fetch('https://api.binance.com/api/v3/ticker/price');
+    if (binanceRes.ok) {
+      const binanceData = await binanceRes.json();
+      const cryptoPrices = {};
+      binanceData.forEach(t => {
+        if(t.symbol.endsWith('USDT')) {
+          cryptoPrices[t.symbol.replace('USDT','')] = parseFloat(t.price);
+        }
+      });
+      MARKET.forEach(m => {
+         if(m.type==='crypto' && cryptoPrices[m.ticker]) { m.price = cryptoPrices[m.ticker]; updated = true; }
+      });
+      state.holdings.forEach(h => {
+         if(cryptoPrices[h.ticker]) { h.price = cryptoPrices[h.ticker]; updated = true; }
+      });
+    }
+  } catch(e) { console.warn("Binance update failed", e); }
+
+  if(updated) {
+    saveState();
+    renderAll();
+  }
+}
+
+async function updateFX() {
+  try {
+    const res = await fetch('https://www.cbr-xml-daily.ru/daily_json.js');
+    if (res.ok) {
+      const data = await res.json();
+      let updated = false;
+      if (data.Valute && data.Valute.USD) {
+        FX.USD_RUB = data.Valute.USD.Value;
+        updated = true;
+      }
+      if (data.Valute && data.Valute.EUR) {
+        FX.EUR_RUB = data.Valute.EUR.Value;
+        updated = true;
+      }
+      if (updated) {
+        saveState();
+        renderAll();
+      }
+    }
+  } catch (e) {
+    console.warn('FX update failed', e);
+  }
+}

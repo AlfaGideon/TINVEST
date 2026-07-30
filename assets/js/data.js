@@ -1,4 +1,4 @@
-export const FX = { USD_RUB: 92.4, EUR_RUB: 100.2 };
+export export const FX = { USD_RUB: 92.4, EUR_RUB: 100.2 };
 
 export const SECTORS = {
   tech: { label: 'Технологии', color: '#4f7cff' },
@@ -28,26 +28,25 @@ export const MARKET = [
   { ticker:'LQDT', name:'Ликвидность', price:1432, change:0.02, sector:'cash', type:'etf', cap:'210B RUB', icon:'₽', color:'#64748b' },
 ];
 
-export const DEFAULT_HOLDINGS = [
-  { id:'h1', ticker:'NVDA', name:'NVIDIA Corp', type:'stock', sector:'tech', qty:12, avgPrice:122.5, price:184.72, currency:'USD', color:'#76b900', icon:'N' },
-  { id:'h2', ticker:'SBER', name:'Сбербанк', qty:120, avgPrice:268.2, price:312.4, currency:'RUB', type:'stock', sector:'finance', color:'#21a038', icon:'СБ' },
-  { id:'h3', ticker:'YDEX', name:'Яндекс', qty:22, avgPrice:3850, price:4125, currency:'RUB', type:'stock', sector:'tech', color:'#ff0000', icon:'Я' },
-  { id:'h4', ticker:'VOO', name:'Vanguard S&P 500', qty:18, avgPrice:462.1, price:512.3, currency:'USD', type:'etf', sector:'etf', color:'#6b21a8', icon:'V' },
-  { id:'h5', ticker:'BTC', name:'Bitcoin', qty:0.32, avgPrice:41200, price:68240, currency:'USD', type:'crypto', sector:'crypto', color:'#f7931a', icon:'₿' },
-  { id:'h6', ticker:'SU26238', name:'ОФЗ 26238', qty:40, avgPrice:64.2, price:68.42, currency:'RUB', type:'bond', sector:'bond', color:'#0ea5e9', icon:'О' },
-  { id:'h7', ticker:'LQDT', name:'Ликвидность', qty:85, avgPrice:1410, price:1432, currency:'RUB', type:'etf', sector:'cash', color:'#64748b', icon:'₽' },
-];
+export const DEFAULT_HOLDINGS = [];
 
 export function generateHistory(baseValue, months=24, volatility=0.045, trend=0.008){
   const now = Date.now();
   let val = baseValue;
   const data=[];
   const labels=[];
+  // seeded random based on baseValue to keep chart stable
+  let seed = Math.round(baseValue);
+  const random = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  
   for(let i=months;i>=0;i--){
     const d = new Date(now);
     d.setMonth(d.getMonth()-i);
     labels.push(d.toLocaleDateString('ru-RU',{month:'short',year:'2-digit'}));
-    val = val * (1 + trend + (Math.random()-0.5)*volatility);
+    val = val * (1 + trend + (random()-0.5)*volatility);
     data.push(Math.round(val));
   }
   return {labels, data};
