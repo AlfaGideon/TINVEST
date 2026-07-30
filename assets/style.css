@@ -196,3 +196,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .spark{width:80px;height:28px}
 .hl{color:var(--accent)}
 .glow{position:absolute;pointer-events:none;filter:blur(40px);opacity:0.35}
+
+/* interactive affordances */
+.chip,.nav-item,.tab,a[data-view-link]{cursor:pointer}
+.chip:active,.tab:active,.btn:active{transform:translateY(1px)}

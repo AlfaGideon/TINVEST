@@ -82,7 +82,7 @@
       </div>
       <div class="topbar-actions">
         <button class="btn-icon" id="currencyToggle" title="Переключить валюту">₽/$</button>
-        <button class="btn-icon">🔔</button>
+        <button class="btn-icon" id="btnNotifications" title="Уведомления">🔔</button>
         <button class="btn btn-primary" id="btnAddHolding"><span>+</span> Купить</button>
       </div>
     </header>
@@ -118,7 +118,7 @@
           <div class="card">
             <h3 style="font-weight:700;margin-bottom:12px">Аллокация</h3>
             <div class="chart-wrap sm"><canvas id="allocChart"></canvas></div>
-            <div class="chips" style="margin-top:12px"><span class="chip active">По классу</span><span class="chip">По секторам</span><span class="chip">По валюте</span></div>
+            <div class="chips" id="allocChips" style="margin-top:12px"><span class="chip active" data-alloc="type">По классу</span><span class="chip" data-alloc="sector">По секторам</span><span class="chip" data-alloc="currency">По валюте</span></div>
           </div>
         </div>
 
@@ -139,7 +139,7 @@
       <div class="view" id="view-portfolio">
         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px">
           <h1 style="font-size:24px;font-weight:800">Портфель</h1>
-          <div style="display:flex;gap:8px"><button class="btn btn-ghost" id="btnAddHolding2">+ Сделка</button><button class="btn btn-primary">Ребалансировать</button></div>
+          <div style="display:flex;gap:8px"><button class="btn btn-ghost" id="btnAddHolding2">+ Сделка</button><button class="btn btn-primary" id="btnRebalance">Ребалансировать</button></div>
         </div>
         <div class="table-wrap"><table><thead><tr><th>Актив</th><th>Тип</th><th>Кол-во</th><th>Средняя → Цена</th><th>Стоимость • Вес</th><th>P&L</th><th></th></tr></thead><tbody id="holdingsTableBody"></tbody></table></div>
 
