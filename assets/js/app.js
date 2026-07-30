@@ -176,6 +176,19 @@ function bindEvents(){
   });
 
   $('#addGoalBtn')?.addEventListener('click', addGoal);
+
+  // Goal type tabs
+  $$('.tabs[data-tabs="goalType"] .tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      const group = tab.closest('.tabs');
+      group.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      const type = tab.dataset.goalType;
+      $('#goalFormCustom').style.display = type==='custom' ? 'block' : 'none';
+      $('#goalFormRetirement').style.display = type==='retirement' ? 'block' : 'none';
+      $('#goalFormDebt').style.display = type==='debt' ? 'block' : 'none';
+    });
+  });
   $('#exportBtn')?.addEventListener('click', exportData);
   $('#importBtn')?.addEventListener('click', ()=> $('#importFile').click());
   $('#importFile')?.addEventListener('change', importData);
@@ -697,28 +710,67 @@ function renderStressTest(){
 function renderGoals(){
   const grid = $('#goalsGrid');
   const summary = $('#goalsSummary');
+  const navBadge = $('#goalsNavBadge');
   const saved = state.goals.reduce((s,g)=>s+(+g.current||0),0);
   const target = state.goals.reduce((s,g)=>s+(+g.target||0),0);
+  if(navBadge) navBadge.textContent = state.goals.length;
   if(summary){
     if(!state.goals.length) summary.textContent = '0 целей';
     else summary.textContent = `${state.goals.length} цел${state.goals.length===1?'ь':(state.goals.length<5?'и':'ей')} • ${fmt(saved,'RUB')} накоплено`;
   }
   if(!grid) return;
   if(!state.goals.length){
-    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;padding:40px"><div class="empty-icon">🎯</div>Целей пока нет. Создайте первую цель ниже.</div>';
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;padding:40px"><div class="empty-icon">🎯</div>Целей пока нет. Создайте первую цель ниже — выберите тип: своя, пенсия или закрытие долга.</div>';
     return;
   }
   grid.innerHTML = state.goals.map(g=>{
-    const pct = Math.min(100, g.current/g.target*100);
-    return `<div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="display:flex;gap:10px;align-items:center"><div style="width:42px;height:42px;border-radius:12px;background:var(--card2);border:1px solid var(--border);display:grid;place-items:center;font-size:20px">${g.icon||'🎯'}</div><div><div style="font-weight:700">${g.name}</div><div class="mini muted">до ${new Date(g.date||'2030-12-31').toLocaleDateString('ru-RU')}</div></div></div>
-        <button class="btn-ghost btn-sm" style="border:1px solid var(--border)" data-del-goal="${g.id}">✕</button>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="mini muted">${fmt(g.current,'RUB')}</span><span class="mini muted">${fmt(g.target,'RUB')}</span></div>
-      <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px"><span class="pill pill-blue">${pct.toFixed(1)}%</span><span class="mini muted">Осталось ${fmt(Math.max(0,g.target-g.current),'RUB')}</span></div>
-    </div>`;
+    if(g.goalType==='retirement'){
+      const pct = g.target ? Math.min(100, g.current/g.target*100) : 0;
+      const yearsLeft = g.currentAge && g.retAge ? g.retAge - g.currentAge : 0;
+      return `<div class="card goal-card-retirement">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;gap:10px;align-items:center"><div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,197,94,0.08));border:1px solid rgba(34,197,94,0.25);display:grid;place-items:center;font-size:20px">${g.icon||'🏖️'}</div><div><div style="font-weight:700">${g.name}</div><div class="mini muted">Пенсия ${fmt(g.pension,'RUB')}/мес • через ${yearsLeft} лет (в ${g.retAge||'?'})</div></div></div>
+          <button class="btn-ghost btn-sm" style="border:1px solid var(--border)" data-del-goal="${g.id}">✕</button>
+        </div>
+        <div class="goal-metrics">
+          <div class="goal-metric"><div class="goal-metric-label">Нужно капитала</div><div class="goal-metric-value">${fmt(g.requiredCapital||g.target,'RUB')}</div></div>
+          <div class="goal-metric"><div class="goal-metric-label">Копить /мес</div><div class="goal-metric-value" style="color:var(--accent)">${fmt(g.monthlyNeeded||0,'RUB')}</div></div>
+          <div class="goal-metric"><div class="goal-metric-label">Ставка изъятия</div><div class="goal-metric-value">${g.withdrawalRate||4}%</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="mini muted">Накоплено ${fmt(g.current,'RUB')}</span><span class="mini muted">${pct.toFixed(1)}%</span></div>
+        <div class="progress"><div class="progress-bar" style="width:${pct}%;background:linear-gradient(90deg, #22c55e, #4ade80)"></div></div>
+        <div class="mini muted" style="margin-top:8px;text-align:center">${g.monthlyNeeded>0 ? `Откладывая ${fmt(g.monthlyNeeded,'RUB')}/мес при ${g.expectedReturn||10}% годовых — достигнете к ${new Date(g.date).toLocaleDateString('ru-RU')}` : 'Цель достигнута!'}</div>
+      </div>`;
+    } else if(g.goalType==='debt'){
+      const pctPaid = g.originalAmount ? Math.min(100, (g.debtPaid||0)/g.originalAmount*100) : 0;
+      const remaining = Math.max(0, (g.debtAmount||0) - (g.debtPaid||0));
+      const debtTypeLabels = {credit_card:'Кредитная карта', mortgage:'Ипотека', car_loan:'Автокредит', personal_loan:'Потреб. кредит', other:'Долг'};
+      return `<div class="card goal-card-debt">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;gap:10px;align-items:center"><div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.08));border:1px solid rgba(239,68,68,0.25);display:grid;place-items:center;font-size:20px">${g.icon||'💳'}</div><div><div style="font-weight:700">${g.name}</div><div class="mini muted">${debtTypeLabels[g.debtType]||g.debtType} • ${g.debtRate||0}% годовых</div></div></div>
+          <button class="btn-ghost btn-sm" style="border:1px solid var(--border)" data-del-goal="${g.id}">✕</button>
+        </div>
+        <div class="goal-metrics">
+          <div class="goal-metric"><div class="goal-metric-label">Остаток долга</div><div class="goal-metric-value" style="color:var(--red)">${fmt(remaining,'RUB')}</div></div>
+          <div class="goal-metric"><div class="goal-metric-label">Платёж /мес</div><div class="goal-metric-value">${fmt(g.monthlyPayment||0,'RUB')}</div></div>
+          <div class="goal-metric"><div class="goal-metric-label">Переплата</div><div class="goal-metric-value" style="color:#f59e0b">${fmt(g.totalInterest||0,'RUB')}</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="mini muted">Погашено ${fmt(g.debtPaid||0,'RUB')}</span><span class="mini muted">${pctPaid.toFixed(1)}%</span></div>
+        <div class="progress"><div class="progress-bar debt-bar" style="width:${pctPaid}%"></div></div>
+        <div class="mini muted" style="margin-top:8px;text-align:center">${remaining>0 ? `Погасите к ${new Date(g.date).toLocaleDateString('ru-RU')} (через ${g.monthsToPayoff||'?'} мес.)` : '🎉 Долг полностью погашен!'}</div>
+      </div>`;
+    } else {
+      const pct = Math.min(100, g.current/g.target*100);
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;gap:10px;align-items:center"><div style="width:42px;height:42px;border-radius:12px;background:var(--card2);border:1px solid var(--border);display:grid;place-items:center;font-size:20px">${g.icon||'🎯'}</div><div><div style="font-weight:700">${g.name}</div><div class="mini muted">до ${new Date(g.date||'2030-12-31').toLocaleDateString('ru-RU')}</div></div></div>
+          <button class="btn-ghost btn-sm" style="border:1px solid var(--border)" data-del-goal="${g.id}">✕</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="mini muted">${fmt(g.current,'RUB')}</span><span class="mini muted">${fmt(g.target,'RUB')}</span></div>
+        <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px"><span class="pill pill-blue">${pct.toFixed(1)}%</span><span class="mini muted">Осталось ${fmt(Math.max(0,g.target-g.current),'RUB')}</span></div>
+      </div>`;
+    }
   }).join('');
 }
 
@@ -1002,15 +1054,100 @@ function calcGoal(){
 }
 
 function addGoal(){
-  const name = $('#newGoalName').value.trim();
-  const target = parseFloat($('#newGoalTarget').value);
-  const current = parseFloat($('#newGoalCurrent').value)||0;
-  const date = $('#newGoalDate').value;
-  if(!name || !target) return alert('Введите название и цель');
-  state.goals.push({ id:'g_'+Math.random().toString(36).slice(2,7), name, target, current, date:date||'2028-12-31', icon:'🎯' });
-  saveState(); renderGoals();
-  $('#newGoalName').value=''; $('#newGoalTarget').value=''; $('#newGoalCurrent').value='';
-  toast('Цель добавлена');
+  const activeTab = document.querySelector('.tabs[data-tabs="goalType"] .tab.active');
+  const goalType = activeTab ? activeTab.dataset.goalType : 'custom';
+
+  if(goalType==='retirement'){
+    const name = $('#retGoalName').value.trim() || 'Пенсия';
+    const pension = parseFloat($('#retGoalPension').value);
+    const wr = parseFloat($('#retGoalWR').value)||4;
+    const retReturn = parseFloat($('#retGoalReturn').value)||10;
+    const retAge = parseInt($('#retGoalAge').value);
+    const curAge = parseInt($('#retGoalCurAge').value)||30;
+    const current = parseFloat($('#retGoalCurrent').value)||0;
+    if(!pension || !retAge) return alert('Введите желаемую пенсию и возраст выхода');
+    if(retAge <= curAge) return alert('Возраст выхода на пенсию должен быть больше текущего возраста');
+    // 4% rule: required_capital = (pension * 12) / withdrawal_rate
+    const requiredCapital = Math.round((pension * 12) / (wr / 100));
+    const monthsToRetire = (retAge - curAge) * 12;
+    const r = retReturn/100/12;
+    let monthlyNeeded = 0;
+    if(r>0){
+      const fv = requiredCapital - current * Math.pow(1+r, monthsToRetire);
+      if(fv>0) monthlyNeeded = Math.round(fv * r / (Math.pow(1+r, monthsToRetire)-1));
+    } else {
+      monthlyNeeded = Math.round((requiredCapital - current) / monthsToRetire);
+    }
+    const targetDate = new Date();
+    targetDate.setFullYear(targetDate.getFullYear() + Math.round(monthsToRetire/12));
+    state.goals.push({
+      id:'g_'+Math.random().toString(36).slice(2,7),
+      name, target: requiredCapital, current,
+      date: targetDate.toISOString().slice(0,10),
+      icon:'🏖️',
+      goalType:'retirement',
+      pension, withdrawalRate:wr, expectedReturn:retReturn,
+      retirementAge:retAge, currentAge:curAge, monthlyNeeded,
+      requiredCapital, retAge
+    });
+    saveState(); renderGoals();
+    $('#retGoalName').value=''; $('#retGoalPension').value=''; $('#retGoalAge').value='';
+    $('#retGoalCurAge').value='30'; $('#retGoalCurrent').value='';
+    toast(`Цель «Пенсия»: нужно ${fmt(requiredCapital,'RUB')}, откладывать ~${fmt(monthlyNeeded,'RUB')}/мес`);
+  } else if(goalType==='debt'){
+    const name = $('#debtGoalName').value.trim() || 'Долг';
+    const amount = parseFloat($('#debtGoalAmount').value);
+    const rate = parseFloat($('#debtGoalRate').value)||0;
+    const payment = parseFloat($('#debtGoalPayment').value);
+    const paid = parseFloat($('#debtGoalPaid').value)||0;
+    const debtType = $('#debtGoalType').value;
+    if(!amount || !payment) return alert('Введите сумму долга и ежемесячный платёж');
+    if(payment <= 0) return alert('Платёж должен быть больше нуля');
+    const monthlyRate = rate/100/12;
+    let monthsToPayoff = 0;
+    let totalInterest = 0;
+    let remaining = amount - paid;
+    if(monthlyRate===0){
+      monthsToPayoff = Math.ceil(remaining/payment);
+      totalInterest = 0;
+    } else {
+      // Standard amortization: months = log(payment/(payment - rate*balance)) / log(1+rate)
+      const minPayment = remaining * monthlyRate;
+      if(payment <= minPayment){
+        return alert(`Платёж (${fmt(payment,'RUB')}) должен быть больше процентов (${fmt(Math.round(minPayment),'RUB')}/мес), иначе долг не будет уменьшаться.`);
+      }
+      monthsToPayoff = Math.ceil(Math.log(payment/(payment - monthlyRate*remaining)) / Math.log(1+monthlyRate));
+      totalInterest = Math.round(payment * monthsToPayoff - remaining);
+    }
+    const payoffDate = new Date();
+    payoffDate.setMonth(payoffDate.getMonth() + monthsToPayoff);
+    const debtIcons = {credit_card:'💳', mortgage:'🏠', car_loan:'🚗', personal_loan:'💰', other:'📋'};
+    const debtLabels = {credit_card:'Кредитная карта', mortgage:'Ипотека', car_loan:'Автокредит', personal_loan:'Потреб. кредит', other:'Долг'};
+    state.goals.push({
+      id:'g_'+Math.random().toString(36).slice(2,7),
+      name, target:0, current: amount-paid,
+      date: payoffDate.toISOString().slice(0,10),
+      icon: debtIcons[debtType]||'💳',
+      goalType:'debt',
+      debtAmount:amount, debtRate:rate, monthlyPayment:payment,
+      debtPaid:paid, monthsToPayoff, totalInterest, debtType,
+      originalAmount:amount
+    });
+    saveState(); renderGoals();
+    $('#debtGoalName').value=''; $('#debtGoalAmount').value=''; $('#debtGoalRate').value='';
+    $('#debtGoalPayment').value=''; $('#debtGoalPaid').value='';
+    toast(`Долг погасится через ${monthsToPayoff} мес. (${new Date(payoffDate).toLocaleDateString('ru-RU')}), переплата ~${fmt(totalInterest,'RUB')}`);
+  } else {
+    const name = $('#newGoalName').value.trim();
+    const target = parseFloat($('#newGoalTarget').value);
+    const current = parseFloat($('#newGoalCurrent').value)||0;
+    const date = $('#newGoalDate').value;
+    if(!name || !target) return alert('Введите название и цель');
+    state.goals.push({ id:'g_'+Math.random().toString(36).slice(2,7), name, target, current, date:date||'2028-12-31', icon:'🎯', goalType:'custom' });
+    saveState(); renderGoals();
+    $('#newGoalName').value=''; $('#newGoalTarget').value=''; $('#newGoalCurrent').value='';
+    toast('Цель добавлена');
+  }
 }
 
 function exportData(){
