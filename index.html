@@ -324,6 +324,28 @@
 </div>
 
 <script src="./assets/js/data.js"></script>
+<!-- ORDER BOOK MODAL -->
+<div class="modal-overlay" id="orderBookModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head"><h3 id="obTickerTitle">Стакан</h3><button class="btn-icon" style="width:32px;height:32px" data-close-modal>✕</button></div>
+    <div class="modal-body" style="display:grid;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="mini muted">Лучшие заявки</span><span class="mini" style="color:var(--text3)">Объём • Цена</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="padding:8px;border-radius:10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2)">
+          <div class="mini muted">Покупка (Bid)</div>
+          <div id="obBids" style="font-family:JetBrains Mono,monospace;font-size:13px;margin-top:6px;line-height:1.6"></div>
+        </div>
+        <div style="padding:8px;border-radius:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2)">
+          <div class="mini muted">Продажа (Ask)</div>
+          <div id="obAsks" style="font-family:JetBrains Mono,monospace;font-size:13px;margin-top:6px;line-height:1.6"></div>
+        </div>
+      </div>
+      <div class="mini muted" style="line-height:1.5">Данные стаканов — демонстрационные. Для OTC-продуктов (TKVM, REITX, BONDOTC) сделки проходят через брокерский стакан или внебиржевые площадки.</div>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn btn-ghost" data-close-modal>Закрыть</button></div>
+  </div>
+</div>
+
 <script src="./assets/js/app.js"></script>
 <script>
 // small helpers for links

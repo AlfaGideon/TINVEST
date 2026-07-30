@@ -9,6 +9,7 @@ const SECTORS = {
   etf: { label: 'ETF', color: '#8b5cf6' },
   bond: { label: 'Облигации', color: '#06b6d4' },
   crypto: { label: 'Крипто', color: '#f97316' },
+  realestate: { label: 'Недвижимость', color: '#8b5cf6' },
   cash: { label: 'Кэш', color: '#64748b' }
 };
 
@@ -33,6 +34,9 @@ const MARKET = [
   { ticker:'SOL', name:'Solana', price:172.4, change:5.42, sector:'crypto', type:'crypto', cap:'80B', icon:'S', color:'#9945ff' },
   { ticker:'SU26238', name:'ОФЗ 26238', price:68.42, change:0.12, sector:'bond', type:'bond', cap:'-', icon:'О', color:'#0ea5e9' },
   { ticker:'LQDT', name:'Ликвидность', price:1432, change:0.02, sector:'cash', type:'etf', cap:'210B RUB', icon:'₽', color:'#64748b' },
+  { ticker:'TKVM', name:'Кв. метры (TKVM)', price:312000, change:0.85, sector:'realestate', type:'otc', cap:'-', icon:'TK', color:'#8b5cf6' },
+  { ticker:'REITX', name:'Недвижимость OTC', price:8450, change:-0.12, sector:'realestate', type:'otc', cap:'-', icon:'RE', color:'#8b5cf6' },
+  { ticker:'BONDOTC', name:'Облигация внебирж.', price:987, change:0.05, sector:'bond', type:'otc', cap:'-', icon:'BO', color:'#06b6d4' },
 ];
 
 const DEFAULT_HOLDINGS = [];

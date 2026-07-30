@@ -182,6 +182,10 @@ function bindEvents(){
     if(wl){
       toggleWatchlist(wl.dataset.wl);
     }
+    const ob = e.target.closest('[data-orderbook]');
+    if(ob){
+      openOrderBook(ob.dataset.orderbook);
+    }
   });
 
   $('#watchlistGrid')?.addEventListener('click', (e)=>{
@@ -514,7 +518,7 @@ function renderMarkets(filter='', type='all'){
       <td><span class="pill" style="background:rgba(255,255,255,0.06);color:var(--text2);border:1px solid var(--border)">${SECTORS[m.sector]?.label}</span></td>
       <td><b>${(m.currency && m.currency==='RUB') || ['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT','GAZP','LKOH','WUSH','MGNT','MTSS','GMKN','ROSN'].includes(m.ticker) || !['NVDA','AAPL','MSFT','VOO','BTC','ETH','SOL'].includes(m.ticker) ? fmt(m.price,'RUB'): fmt(m.price,'USD')}</b><div class="mini ${m.change>=0?'pill-green':'pill-red'}" style="display:inline-flex;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:11px">${fmtPct(m.change)}</div></td>
       <td class="muted">${m.cap}</td>
-      <td><div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" data-buy="${m.ticker}">Купить</button><button class="btn-ghost btn-sm" data-wl="${m.ticker}" style="border:1px solid var(--border)">${inWl?'★':'☆'}</button></div></td>
+      <td><div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" data-buy="${m.ticker}">Купить</button><button class="btn-ghost btn-sm" data-wl="${m.ticker}" style="border:1px solid var(--border)">${inWl?'★':'☆'}</button>${m.type==='otc'?`<button class="btn-ghost btn-sm" data-orderbook="${m.ticker}" style="border:1px solid var(--border);font-size:11px">Стакан</button>`:''}</div></td>
     </tr>`;
   }).join('');
 
@@ -967,6 +971,28 @@ function renderAnalyticCharts(){
 }
 
 // Modals
+function openOrderBook(ticker){
+  const item = mergedMarket.find(m=>m.ticker===ticker);
+  if(!item) return;
+  $('#obTickerTitle').textContent = item.ticker + ' — Стакан';
+  const price = item.price || 100;
+  const bids = [
+    {qty: 10, price: Math.round(price*0.998)},
+    {qty: 25, price: Math.round(price*0.994)},
+    {qty: 40, price: Math.round(price*0.990)},
+    {qty: 100, price: Math.round(price*0.985)},
+  ];
+  const asks = [
+    {qty: 15, price: Math.round(price*1.002)},
+    {qty: 30, price: Math.round(price*1.006)},
+    {qty: 55, price: Math.round(price*1.010)},
+    {qty: 90, price: Math.round(price*1.015)},
+  ];
+  $('#obBids').innerHTML = bids.map(b=>`<div style="display:flex;justify-content:space-between;color:#22c55e"><span>${b.qty}</span><span>${fmt(b.price,'RUB')}</span></div>`).join('');
+  $('#obAsks').innerHTML = asks.map(a=>`<div style="display:flex;justify-content:space-between;color:#ef4444"><span>${a.qty}</span><span>${fmt(a.price,'RUB')}</span></div>`).join('');
+  $('#orderBookModal').classList.add('open');
+}
+
 function openBuyModal(prefilled=null){
   const modal = $('#buyModal');
   if(!modal) return;
