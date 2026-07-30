@@ -1,4 +1,5 @@
 const { MARKET, DEFAULT_HOLDINGS, FX, SECTORS, generateHistory } = window.TINVEST_DATA;
+let mergedMarket = [...MARKET];
 
 const STORAGE_KEY = 'tinvest_v3'; // bumped to drop old demo-data snapshots
 let state = loadState();
@@ -12,13 +13,18 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
+      if(parsed.fx) {
+        FX.USD_RUB = parsed.fx.USD_RUB || FX.USD_RUB;
+        FX.EUR_RUB = parsed.fx.EUR_RUB || FX.EUR_RUB;
+      }
       return {
         profile: parsed.profile || { name: 'Инвестор' },
         holdings: Array.isArray(parsed.holdings) ? parsed.holdings : [],
         transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
         watchlist: Array.isArray(parsed.watchlist) ? parsed.watchlist : [],
         goals: Array.isArray(parsed.goals) ? parsed.goals : [],
-        settings: Object.assign({ currency:'RUB', showRUB:true }, parsed.settings || {})
+        settings: Object.assign({ currency:'RUB', showRUB:true }, parsed.settings || {}),
+        fx: parsed.fx || { USD_RUB: FX.USD_RUB, EUR_RUB: FX.EUR_RUB }
       };
     }
   }catch(e){console.warn(e)}
@@ -28,7 +34,8 @@ function loadState(){
     transactions: [],
     watchlist: [],
     goals: [],
-    settings: { currency:'RUB', showRUB:true }
+    settings: { currency:'RUB', showRUB:true },
+    fx: { USD_RUB: FX.USD_RUB, EUR_RUB: FX.EUR_RUB }
   };
 }
 
@@ -45,6 +52,7 @@ function genTransactions(holdings){
 }
 
 function saveState(){
+  state.fx = { USD_RUB: FX.USD_RUB, EUR_RUB: FX.EUR_RUB };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -133,6 +141,22 @@ function bindEvents(){
     saveState(); renderAll();
   });
 
+  // exchange rate manual edit
+  $('#sbUsdRow')?.addEventListener('click', ()=>{
+    const val = prompt('Укажите курс USD/RUB (ЦБ или рыночный):', FX.USD_RUB);
+    if(val && !isNaN(parseFloat(val))) {
+      FX.USD_RUB = parseFloat(val);
+      saveState(); renderAll();
+    }
+  });
+  $('#sbEurRow')?.addEventListener('click', ()=>{
+    const val = prompt('Укажите курс EUR/RUB (ЦБ или рыночный):', FX.EUR_RUB);
+    if(val && !isNaN(parseFloat(val))) {
+      FX.EUR_RUB = parseFloat(val);
+      saveState(); renderAll();
+    }
+  });
+
   // modal generic close
   $$('[data-close-modal]').forEach(el=>el.addEventListener('click', ()=> closeModals()));
   $$('.modal-overlay').forEach(ov=> ov.addEventListener('click', (e)=>{ if(e.target===ov) closeModals(); }));
@@ -147,7 +171,7 @@ function bindEvents(){
     const btn = e.target.closest('[data-buy]');
     if(btn){
       const ticker = btn.dataset.buy;
-      const item = MARKET.find(m=>m.ticker===ticker);
+      const item = mergedMarket.find(m=>m.ticker===ticker);
       if(item) openBuyModal(item);
     }
     const wl = e.target.closest('[data-wl]');
@@ -159,7 +183,7 @@ function bindEvents(){
   $('#watchlistGrid')?.addEventListener('click', (e)=>{
     const btn = e.target.closest('[data-buy]');
     if(btn){
-      const item = MARKET.find(m=>m.ticker===btn.dataset.buy);
+      const item = mergedMarket.find(m=>m.ticker===btn.dataset.buy);
       if(item) openBuyModal(item);
     }
   });
@@ -252,15 +276,15 @@ function bindEvents(){
     if(!btn) return;
     const action = btn.dataset.recAction;
     if(action==='Купить LQDT'){
-      const item = MARKET.find(m=>m.ticker==='LQDT');
+      const item = mergedMarket.find(m=>m.ticker==='LQDT');
       if(item) openBuyModal(item);
     } else if(action==='Ребалансировать'){
       showRebalance();
     } else if(action==='Добавить ETF'){
-      const item = MARKET.find(m=>m.ticker==='TMOS');
+      const item = mergedMarket.find(m=>m.ticker==='TMOS');
       if(item) openBuyModal(item);
     } else if(action==='План докупки'){
-      const item = MARKET.find(m=>m.ticker==='BTC');
+      const item = mergedMarket.find(m=>m.ticker==='BTC');
       if(item) openBuyModal(item);
     } else {
       toast('ИИС-3: вычет до 400 000 ₽ в год, льгота по НДФЛ после 5 лет.');
@@ -334,7 +358,7 @@ function renderSidebarLive(){
   const bar = $('#sbLiveBar'), lbl = $('#sbLiveLabel');
   if(usd) usd.textContent = FX.USD_RUB ? FX.USD_RUB.toFixed(2)+' ₽' : '—';
   if(eur) eur.textContent = FX.EUR_RUB ? FX.EUR_RUB.toFixed(2)+' ₽' : '—';
-  const btcItem = MARKET.find(m=>m.ticker==='BTC');
+  const btcItem = mergedMarket.find(m=>m.ticker==='BTC');
   if(btc && btcItem){
     btc.textContent = '$'+Math.round(btcItem.price).toLocaleString('ru-RU');
     btc.style.color = btcItem.change>=0 ? '#22c55e' : '#ef4444';
@@ -450,7 +474,7 @@ function renderPortfolio(){
 }
 
 function renderMarkets(filter='', type='all'){
-  let list = MARKET;
+  let list = mergedMarket;
   if(type!=='all'){
     list = list.filter(m=>m.type===type);
   }
@@ -465,7 +489,7 @@ function renderMarkets(filter='', type='all'){
     return `<tr>
       <td><div class="asset-cell"><div class="asset-icon" style="background:${m.color}">${m.icon}</div><div><div style="font-weight:700">${m.ticker}</div><div class="mini muted">${m.name}</div></div></div></td>
       <td><span class="pill" style="background:rgba(255,255,255,0.06);color:var(--text2);border:1px solid var(--border)">${SECTORS[m.sector]?.label}</span></td>
-      <td><b>${m.currency==='RUB' || ['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT'].includes(m.ticker) ? fmt(m.price,'RUB'): fmt(m.price,'USD')}</b><div class="mini ${m.change>=0?'pill-green':'pill-red'}" style="display:inline-flex;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:11px">${fmtPct(m.change)}</div></td>
+      <td><b>${(m.currency && m.currency==='RUB') || ['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT','GAZP','LKOH','WUSH','MGNT','MTSS','GMKN','ROSN'].includes(m.ticker) || !['NVDA','AAPL','MSFT','VOO','BTC','ETH','SOL'].includes(m.ticker) ? fmt(m.price,'RUB'): fmt(m.price,'USD')}</b><div class="mini ${m.change>=0?'pill-green':'pill-red'}" style="display:inline-flex;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:11px">${fmtPct(m.change)}</div></td>
       <td class="muted">${m.cap}</td>
       <td><div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" data-buy="${m.ticker}">Купить</button><button class="btn-ghost btn-sm" data-wl="${m.ticker}" style="border:1px solid var(--border)">${inWl?'★':'☆'}</button></div></td>
     </tr>`;
@@ -479,7 +503,7 @@ function renderMarkets(filter='', type='all'){
 function renderWatchlist(){
   const grid = $('#watchlistGrid');
   if(!grid) return;
-  const items = MARKET.filter(m=> state.watchlist.includes(m.ticker));
+  const items = mergedMarket.filter(m=> state.watchlist.includes(m.ticker));
   if(!items.length){
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">⭐</div>Добавьте активы в избранное, нажимая ☆ в таблице рынков</div>`;
     return;
@@ -490,7 +514,7 @@ function renderWatchlist(){
         <div class="asset-cell"><div class="asset-icon" style="background:${m.color}">${m.icon}</div><div><b>${m.ticker}</b><div class="mini muted">${m.name}</div></div></div>
         <span class="pill ${m.change>=0?'pill-green':'pill-red'}">${fmtPct(m.change)}</span>
       </div>
-      <div style="font-size:20px;font-weight:800">${fmt(m.price, m.ticker.match(/^[A-Z]+$/) && ['BTC','ETH','SOL','NVDA','AAPL','MSFT','VOO'].includes(m.ticker) ? 'USD':'RUB')}</div>
+      <div style="font-size:20px;font-weight:800">${fmt(m.price, ['BTC','ETH','SOL','NVDA','AAPL','MSFT','VOO'].includes(m.ticker) ? 'USD':'RUB')}</div>
       <div class="mini muted" style="margin:6px 0 12px">Капитализация: ${m.cap}</div>
       <div style="display:flex;gap:8px"><button class="btn btn-primary btn-sm" style="flex:1" data-buy="${m.ticker}">Купить</button><button class="btn-ghost btn-sm" onclick="window.app.toggleWatchlist('${m.ticker}')" style="border:1px solid var(--border)">Удалить</button></div>
     </div>
@@ -930,7 +954,7 @@ function openBuyModal(prefilled=null){
     $('#buyTicker').value = prefilled.ticker || '';
     $('#buyName').value = prefilled.name || '';
     $('#buyPrice').value = prefilled.price ?? '';
-    const isRu = ['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT','GAZP','GMKN','ROSN','MAGN','NVTK','PLZL','SNGS','TATN','CHMF','IRAO','VTBR','ALRS','AFLT','HYDR','PIKK','DSKY','OZON','FIVE','POLY','RUAL','TRNFP','UPRO','PHOR'].includes(prefilled.ticker) || (prefilled.sector && prefilled.sector!=='crypto' && prefilled.cap && String(prefilled.cap).includes('RUB'));
+    const isRu = ['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT','GAZP','GMKN','ROSN','MAGN','NVTK','PLZL','SNGS','TATN','CHMF','IRAO','VTBR','ALRS','AFLT','HYDR','PIKK','DSKY','OZON','FIVE','POLY','RUAL','TRNFP','UPRO','PHOR','WUSH','MGNT','MTSS'].includes(prefilled.ticker) || (prefilled.sector && prefilled.sector!=='crypto' && prefilled.cap && String(prefilled.cap).includes('RUB'));
     $('#buyCurrency').value = isRu ? 'RUB':'USD';
     // Focus qty
     setTimeout(()=>$('#buyQty')?.focus(), 60);
@@ -949,7 +973,7 @@ function handleBuySubmit(e){
   const price = parseFloat($('#buyPrice').value);
   const currency = $('#buyCurrency').value;
   if(!ticker || !qty || !price) return alert('Заполните поля');
-  const existingMarket = MARKET.find(m=>m.ticker===ticker) || {};
+  const existingMarket = mergedMarket.find(m=>m.ticker===ticker) || {};
   const existing = state.holdings.find(h=>h.ticker===ticker);
   if(existing){
     const totalCost = existing.qty*existing.avgPrice + qty*price;
@@ -1243,13 +1267,24 @@ async function fetchMoexBoard(board) {
     const res = await fetch(`https://iss.moex.com/iss/engines/stock/markets/shares/boards/${board}/securities.json`);
     if(!res.ok) return {};
     const data = await res.json();
-    const prices = {};
-    const secIdx = data.marketdata.columns.indexOf('SECID');
+    const result = {};
+    const secIdIdx = data.securities.columns.indexOf('SECID');
+    const nameIdx = data.securities.columns.indexOf('SHORTNAME');
+    const mktIdIdx = data.marketdata.columns.indexOf('SECID');
     const lastIdx = data.marketdata.columns.indexOf('LAST');
+    const changeIdx = data.marketdata.columns.indexOf('CHANGE');
+    const mktMap = {};
     data.marketdata.data.forEach(row => {
-      if(row[lastIdx]) prices[row[secIdx]] = row[lastIdx];
+      mktMap[row[mktIdIdx]] = { price: row[lastIdx], change: row[changeIdx] };
     });
-    return prices;
+    data.securities.data.forEach(row => {
+      const ticker = row[secIdIdx];
+      const m = mktMap[ticker];
+      if(m && m.price) {
+        result[ticker] = { ticker, name: row[nameIdx], price: m.price, change: m.change || 0 };
+      }
+    });
+    return result;
   } catch(e) { return {}; }
 }
 
@@ -1258,14 +1293,24 @@ async function fetchMoexBonds(board) {
     const res = await fetch(`https://iss.moex.com/iss/engines/stock/markets/bonds/boards/${board}/securities.json`);
     if(!res.ok) return {};
     const data = await res.json();
-    const prices = {};
-    const secIdx = data.marketdata.columns.indexOf('SECID');
-    // For bonds, price is often in % of nominal, let's just grab LAST or PREVPRICE
+    const result = {};
+    const secIdIdx = data.securities.columns.indexOf('SECID');
+    const nameIdx = data.securities.columns.indexOf('SHORTNAME');
+    const mktIdIdx = data.marketdata.columns.indexOf('SECID');
     const lastIdx = data.marketdata.columns.indexOf('LAST');
+    const changeIdx = data.marketdata.columns.indexOf('CHANGE');
+    const mktMap = {};
     data.marketdata.data.forEach(row => {
-      if(row[lastIdx]) prices[row[secIdx]] = row[lastIdx]; // Note: Bond price is % of nominal (usually 1000 RUB), so 95.0 = 950 RUB. Handled manually or users type nominal? Usually users track price directly. Let's just give the raw LAST value.
+      mktMap[row[mktIdIdx]] = { price: row[lastIdx], change: row[changeIdx] };
     });
-    return prices;
+    data.securities.data.forEach(row => {
+      const ticker = row[secIdIdx];
+      const m = mktMap[ticker];
+      if(m && m.price) {
+        result[ticker] = { ticker, name: row[nameIdx], price: m.price, change: m.change || 0, type: 'bond' };
+      }
+    });
+    return result;
   } catch(e) { return {}; }
 }
 
@@ -1273,32 +1318,49 @@ async function updateLivePrices() {
   let updated = false;
   
   // MOEX Shares
-  const moexPrices = Object.assign({}, 
-    await fetchMoexBoard('TQBR'), // Russian shares
-    await fetchMoexBoard('TQTF')  // ETFs
-  );
-  
-  // MOEX Bonds
-  const moexBonds = Object.assign({},
-    await fetchMoexBonds('TQOB'), // OFZ
-    await fetchMoexBonds('TQCB')  // Corp bonds
-  );
+  const moexShares = await fetchMoexBoard('TQBR');
+  const moexEtfs = await fetchMoexBoard('TQTF');
+  const moexOfz = await fetchMoexBonds('TQOB');
+  const moexCbonds = await fetchMoexBonds('TQCB');
 
-  const allMoex = { ...moexPrices, ...moexBonds };
+  const allMoex = { ...moexShares, ...moexEtfs, ...moexOfz, ...moexCbonds };
 
   MARKET.forEach(m => {
      if(allMoex[m.ticker]) { 
-       // If bond, keep as is (often % or raw).
-       m.price = allMoex[m.ticker]; 
+       m.price = allMoex[m.ticker].price; 
+       m.change = allMoex[m.ticker].change;
        updated = true; 
      }
   });
   state.holdings.forEach(h => {
      if(allMoex[h.ticker]) { 
-       h.price = allMoex[h.ticker]; 
+       h.price = allMoex[h.ticker].price; 
        updated = true; 
      }
   });
+
+  // Augment mergedMarket with all securities from MOEX
+  const tempMarket = [...MARKET];
+  let added = false;
+  Object.keys(allMoex).forEach(ticker => {
+    if (!tempMarket.some(m => m.ticker === ticker)) {
+      const s = allMoex[ticker];
+      tempMarket.push({
+        ticker: s.ticker,
+        name: s.name,
+        price: s.price,
+        change: s.change,
+        type: s.type || (ticker.length > 5 ? 'etf' : 'stock'),
+        sector: s.type === 'bond' ? 'bond' : (ticker.length > 5 ? 'etf' : 'tech'),
+        cap: '-',
+        icon: ticker.slice(0, 2).toUpperCase(),
+        color: '#64748b'
+      });
+      added = true;
+    }
+  });
+  mergedMarket = tempMarket;
+  if(added) updated = true;
   
   try {
     const binanceRes = await fetch('https://api.binance.com/api/v3/ticker/price');
@@ -1310,7 +1372,7 @@ async function updateLivePrices() {
           cryptoPrices[t.symbol.replace('USDT','')] = parseFloat(t.price);
         }
       });
-      MARKET.forEach(m => {
+      mergedMarket.forEach(m => {
          if(m.type==='crypto' && cryptoPrices[m.ticker]) { m.price = cryptoPrices[m.ticker]; updated = true; }
       });
       state.holdings.forEach(h => {
@@ -1326,25 +1388,49 @@ async function updateLivePrices() {
 }
 
 async function updateFX() {
+  let updated = false;
+
+  // Try CBR mirror 1
   try {
     const res = await fetch('https://www.cbr-xml-daily.ru/daily_json.js');
     if (res.ok) {
       const data = await res.json();
-      let updated = false;
       if (data.Valute && data.Valute.USD) {
         FX.USD_RUB = data.Valute.USD.Value;
         updated = true;
+        toast('Курсы валют обновлены по данным ЦБ РФ');
       }
       if (data.Valute && data.Valute.EUR) {
         FX.EUR_RUB = data.Valute.EUR.Value;
         updated = true;
       }
-      if (updated) {
-        saveState();
-        renderAll();
-      }
     }
-  } catch (e) {
-    console.warn('FX update failed', e);
+  } catch (e) { console.warn('CBR mirror 1 failed', e); }
+
+  // Fallback to secondary source if primary failed
+  if (!updated) {
+    try {
+      const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.usd && data.usd.rub) {
+          FX.USD_RUB = data.usd.rub;
+          updated = true;
+        }
+      }
+      const resEur = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json');
+      if (resEur.ok) {
+        const dataEur = await resEur.json();
+        if (dataEur.eur && dataEur.eur.rub) {
+          FX.EUR_RUB = dataEur.eur.rub;
+          updated = true;
+        }
+      }
+    } catch (e) { console.warn('Fallback FX failed', e); }
+  }
+
+  if (updated) {
+    saveState();
+    renderAll();
   }
 }
