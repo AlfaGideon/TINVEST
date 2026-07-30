@@ -1,6 +1,6 @@
-export const FX = { USD_RUB: 92.4, EUR_RUB: 100.2 };
+const FX = { USD_RUB: 92.4, EUR_RUB: 100.2 };
 
-export const SECTORS = {
+const SECTORS = {
   tech: { label: 'Технологии', color: '#4f7cff' },
   finance: { label: 'Финансы', color: '#22c55e' },
   energy: { label: 'Энергетика', color: '#f59e0b' },
@@ -11,7 +11,7 @@ export const SECTORS = {
   cash: { label: 'Кэш', color: '#64748b' }
 };
 
-export const MARKET = [
+const MARKET = [
   { ticker:'NVDA', name:'NVIDIA Corp', price:184.72, change:2.34, sector:'tech', type:'stock', cap:'2.8T', icon:'N', color:'#76b900' },
   { ticker:'AAPL', name:'Apple Inc', price:227.48, change:-0.42, sector:'tech', type:'stock', cap:'3.4T', icon:'A', color:'#000' },
   { ticker:'MSFT', name:'Microsoft', price:428.15, change:0.83, sector:'tech', type:'stock', cap:'3.1T', icon:'M', color:'#0078d4' },
@@ -28,9 +28,9 @@ export const MARKET = [
   { ticker:'LQDT', name:'Ликвидность', price:1432, change:0.02, sector:'cash', type:'etf', cap:'210B RUB', icon:'₽', color:'#64748b' },
 ];
 
-export const DEFAULT_HOLDINGS = [];
+const DEFAULT_HOLDINGS = [];
 
-export function generateHistory(baseValue, months=24, volatility=0.045, trend=0.008){
+function generateHistory(baseValue, months=24, volatility=0.045, trend=0.008){
   const now = Date.now();
   let val = baseValue;
   const data=[];
@@ -51,3 +51,7 @@ export function generateHistory(baseValue, months=24, volatility=0.045, trend=0.
   }
   return {labels, data};
 }
+
+// Keep the app usable when index.html is opened directly from the filesystem.
+// (ES modules are blocked by CORS on file:// URLs in most browsers.)
+window.TINVEST_DATA = { MARKET, DEFAULT_HOLDINGS, FX, SECTORS, generateHistory };

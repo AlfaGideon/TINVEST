@@ -41,7 +41,7 @@
 - Прогресс-бар, добавление/удаление, хранение в LocalStorage
 
 ### 🛠 Технологии
-- Чистый HTML/CSS/JS (ES modules), no build needed — сразу работает на GitHub Pages
+- Чистый HTML/CSS/JS, no build needed — работает на GitHub Pages и при открытии `index.html` напрямую
 - Chart.js CDN, Inter font, CSS variables, Responsive, PWA manifest
 - LocalStorage key: `tinvest_v2`
 - Демо-данные: 7 активов (NVDA, SBER, YDEX, VOO, BTC, ОФЗ, LQDT) + 14 инструментов в маркете
