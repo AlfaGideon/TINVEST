@@ -67,15 +67,18 @@ function totalMetrics(){
   state.holdings.forEach(h=>{
     const v = h.qty*h.price;
     const c = h.qty*h.avgPrice;
+    let vr = v;
+    let cr = c;
     if(h.currency==='USD'){
-      totalValueRUB+=v*FX.USD_RUB;
-      totalCostRUB+=c*FX.USD_RUB;
-      totalValueUSD+=v;
-    }else{
-      totalValueRUB+=v;
-      totalCostRUB+=c;
-      totalValueUSD+=v/FX.USD_RUB;
+      vr = v*FX.USD_RUB;
+      cr = c*FX.USD_RUB;
+    }else if(h.currency==='EUR'){
+      vr = v*FX.EUR_RUB;
+      cr = c*FX.EUR_RUB;
     }
+    totalValueRUB+=vr;
+    totalCostRUB+=cr;
+    totalValueUSD+=vr/FX.USD_RUB;
   });
   const pnl = totalValueRUB-totalCostRUB;
   const pnlPct = totalCostRUB? (pnl/totalCostRUB*100):0;
@@ -85,6 +88,7 @@ function totalMetrics(){
 function fmt(n, cur='RUB'){
   if(cur==='RUB') return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:0}).format(n);
   if(cur==='USD') return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
+  if(cur==='EUR') return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n);
   return new Intl.NumberFormat('ru-RU').format(n);
 }
 function fmtPct(n){
@@ -440,15 +444,33 @@ function renderPortfolio(){
     const cost = h.qty*h.avgPrice;
     const pnl = value-cost;
     const pnlPct = cost? (pnl/cost*100):0;
-    const valueRUB = h.currency==='USD'? value*FX.USD_RUB : value;
+    
+    let valueRUB = value;
+    let valueUSD = value;
+    if (h.currency === 'USD') {
+      valueRUB = value * FX.USD_RUB;
+    } else if (h.currency === 'EUR') {
+      valueRUB = value * FX.EUR_RUB;
+      valueUSD = valueRUB / FX.USD_RUB;
+    } else {
+      valueUSD = value / FX.USD_RUB;
+    }
+
+    let pnlRUB = pnl;
+    if (h.currency === 'USD') {
+      pnlRUB = pnl * FX.USD_RUB;
+    } else if (h.currency === 'EUR') {
+      pnlRUB = pnl * FX.EUR_RUB;
+    }
+
     const weight = m.totalValueRUB? (valueRUB/m.totalValueRUB*100):0;
     return `<tr>
       <td><div class="asset-cell"><div class="asset-icon" style="background:${h.color}">${h.icon}</div><div><div style="font-weight:600">${h.ticker}</div><div class="mini muted">${h.name}</div></div></div></td>
       <td>${SECTORS[h.sector]?.label || h.type}</td>
       <td>${h.qty}</td>
-      <td>${h.currency==='USD'? fmt(h.avgPrice,'USD'): fmt(h.avgPrice,'RUB')} → ${h.currency==='USD'? fmt(h.price,'USD'): fmt(h.price,'RUB')}</td>
-      <td><b>${fmt(valueRUB,'RUB')}</b><div class="mini muted">${fmt(value,'USD')} • ${weight.toFixed(1)}%</div></td>
-      <td><span class="pill ${pnl>=0?'pill-green':'pill-red'}">${fmtPct(pnlPct)}</span><div class="mini muted">${fmt(pnl,'RUB')}</div></td>
+      <td>${fmt(h.avgPrice, h.currency)} → ${fmt(h.price, h.currency)}</td>
+      <td><b>${fmt(valueRUB,'RUB')}</b><div class="mini muted">${fmt(valueUSD,'USD')} • ${weight.toFixed(1)}%</div></td>
+      <td><span class="pill ${pnl>=0?'pill-green':'pill-red'}">${fmtPct(pnlPct)}</span><div class="mini muted">${fmt(pnlRUB,'RUB')}</div></td>
       <td>
         <div style="display:flex; gap:8px;">
           <button class="btn-ghost btn-sm" data-edit-holding="${h.id}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border)">✎</button>
@@ -462,12 +484,13 @@ function renderPortfolio(){
   const txBody = $('#txTableBody');
   if(txBody){
     txBody.innerHTML = state.transactions.slice(0,30).map(tx=>{
+      const txCurrency = tx.currency || (['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT','GAZP','GMKN','ROSN','WUSH','MGNT','MTSS'].includes(tx.ticker) ? 'RUB' : 'USD');
       return `<tr>
         <td>${new Date(tx.date).toLocaleDateString('ru-RU')}</td>
         <td><b>${tx.ticker}</b> <span class="mini pill ${tx.type==='buy'?'pill-green':'pill-red'}" style="margin-left:6px">${tx.type==='buy'?'Покупка':'Продажа'}</span></td>
         <td>${tx.qty}</td>
-        <td>${fmt(tx.price, 'RUB')}</td>
-        <td>${fmt(tx.total,'RUB')}</td>
+        <td>${fmt(tx.price, txCurrency)}</td>
+        <td>${fmt(tx.total, txCurrency)}</td>
       </tr>`;
     }).join('');
   }
@@ -980,7 +1003,9 @@ function handleBuySubmit(e){
     const totalQty = existing.qty + qty;
     existing.avgPrice = totalCost/totalQty;
     existing.qty = totalQty;
-    existing.price = price; // update to last
+    if(!existing.price){
+      existing.price = existingMarket.price !== undefined ? existingMarket.price : price;
+    }
   }else{
     // Smart defaulting for custom tickers (not in MARKET)
     let type = existingMarket.type || 'stock';
@@ -998,13 +1023,16 @@ function handleBuySubmit(e){
     }
     state.holdings.push({
       id:'h_'+Math.random().toString(36).slice(2,9),
-      ticker, name, qty, price, avgPrice:price, currency,
+      ticker, name, qty,
+      price: existingMarket.price !== undefined ? existingMarket.price : price,
+      avgPrice:price, currency,
       type, sector, color, icon
     });
   }
   state.transactions.unshift({
     id:'tx_'+Math.random().toString(36).slice(2,9),
-    ticker, type:'buy', qty, price, total:qty*price, date:new Date().toISOString()
+    ticker, type:'buy', qty, price, total:qty*price, date:new Date().toISOString(),
+    currency
   });
   saveState(); renderAll(); closeModals();
   // small toast
