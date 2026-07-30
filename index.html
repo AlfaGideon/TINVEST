@@ -35,7 +35,7 @@
       <div class="nav-section">
         <div class="nav-label">Планирование</div>
         <a class="nav-item" data-view="calculators" href="#"><span>🧮</span> Калькуляторы</a>
-        <a class="nav-item" data-view="goals" href="#"><span>🎯</span> Цели <span class="badge" style="background:#1e2d4a;color:#92a0bd;border:1px solid #25385c">3</span></a>
+        <a class="nav-item" data-view="goals" href="#"><span>🎯</span> Цели <span class="badge" id="goalsNavBadge" style="background:#1e2d4a;color:#92a0bd;border:1px solid #25385c">0</span></a>
       </div>
       <div class="nav-section">
         <div class="nav-label">Данные</div>
@@ -256,13 +256,46 @@
 
       <!-- GOALS -->
       <div class="view" id="view-goals">
-        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px"><h1 style="font-size:24px;font-weight:800">Финансовые цели</h1><span class="pill pill-blue" id="goalsSummary">0 целей</span></div>
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px"><h1 style="font-size:24px;font-weight:800">Умные цели</h1><span class="pill pill-blue" id="goalsSummary">0 целей</span></div>
         <div class="grid grid-3" id="goalsGrid"></div>
+
+        <!-- NEW SMART GOAL FORM -->
         <div class="card" style="margin-top:16px">
-          <h3 style="font-weight:700;margin-bottom:12px">+ Новая цель</h3>
-          <div class="form-row"><div><label class="mini muted">Название</label><input id="newGoalName" class="input" placeholder="Напр. На квартиру"></div><div><label class="mini muted">Дата</label><input id="newGoalDate" class="input" type="date"></div></div>
-          <div class="form-row" style="margin-top:10px"><div><label class="mini muted">Цель, ₽</label><input id="newGoalTarget" class="input" type="number" placeholder="8000000"></div><div><label class="mini muted">Уже есть, ₽</label><input id="newGoalCurrent" class="input" type="number" placeholder="500000"></div></div>
-          <div style="margin-top:12px;display:flex;justify-content:flex-end"><button class="btn btn-primary" id="addGoalBtn">Добавить цель</button></div>
+          <h3 style="font-weight:700;margin-bottom:14px">+ Новая цель</h3>
+          <div class="tabs" data-tabs="goalType" style="margin-bottom:16px">
+            <button class="tab active" data-goal-type="custom">💼 Своя цель</button>
+            <button class="tab" data-goal-type="retirement">🏖️ Пенсия</button>
+            <button class="tab" data-goal-type="debt">💳 Закрытие долга</button>
+          </div>
+
+          <!-- CUSTOM GOAL FORM -->
+          <div id="goalFormCustom">
+            <div class="form-row"><div><label class="mini muted">Название</label><input id="newGoalName" class="input" placeholder="Напр. На квартиру"></div><div><label class="mini muted">Дата</label><input id="newGoalDate" class="input" type="date"></div></div>
+            <div class="form-row" style="margin-top:10px"><div><label class="mini muted">Цель, ₽</label><input id="newGoalTarget" class="input" type="number" placeholder="8000000"></div><div><label class="mini muted">Уже есть, ₽</label><input id="newGoalCurrent" class="input" type="number" placeholder="500000"></div></div>
+          </div>
+
+          <!-- RETIREMENT GOAL FORM -->
+          <div id="goalFormRetirement" style="display:none">
+            <div class="form-row"><div><label class="mini muted">Название (напр. «Ранняя пенсия»)</label><input id="retGoalName" class="input" placeholder="Моя пенсия"></div><div><label class="mini muted">Текущий возраст</label><input id="retGoalCurAge" class="input" type="number" placeholder="30" min="18" max="80" value="30"></div></div>
+            <div class="form-row" style="margin-top:10px">
+              <div><label class="mini muted">Возраст выхода на пенсию</label><input id="retGoalAge" class="input" type="number" placeholder="55" min="25" max="90"></div>
+              <div><label class="mini muted">Желаемая пенсия ₽/мес</label><input id="retGoalPension" class="input" type="number" placeholder="80000"></div>
+            </div>
+            <div class="form-row" style="margin-top:10px">
+              <div><label class="mini muted">Ставка изъятия (4% правило)</label><input id="retGoalWR" class="input" type="number" placeholder="4" step="0.1" min="2" max="10" value="4"></div>
+              <div><label class="mini muted">Ожидаемая доходность % годовых</label><input id="retGoalReturn" class="input" type="number" placeholder="10" step="0.1" min="1" max="30" value="10"></div>
+            </div>
+            <div><label class="mini muted" style="margin-top:10px">Уже накоплено, ₽</label><input id="retGoalCurrent" class="input" type="number" placeholder="500000" value="0"></div>
+          </div>
+
+          <!-- DEBT PAYOFF FORM -->
+          <div id="goalFormDebt" style="display:none">
+            <div class="form-row"><div><label class="mini muted">Название (напр. «Ипотека»)</label><input id="debtGoalName" class="input" placeholder="Кредитная карта"></div><div><label class="mini muted">Тип долга</label><select id="debtGoalType" class="input"><option value="credit_card">Кредитная карта</option><option value="mortgage">Ипотека</option><option value="car_loan">Автокредит</option><option value="personal_loan">Потребительский кредит</option><option value="other">Другое</option></select></div></div>
+            <div class="form-row" style="margin-top:10px"><div><label class="mini muted">Сумма долга, ₽</label><input id="debtGoalAmount" class="input" type="number" placeholder="500000"></div><div><label class="mini muted">Процентная ставка % годовых</label><input id="debtGoalRate" class="input" type="number" placeholder="18.9" step="0.1" min="0" max="100"></div></div>
+            <div class="form-row" style="margin-top:10px"><div><label class="mini muted">Ежемесячный платёж, ₽</label><input id="debtGoalPayment" class="input" type="number" placeholder="15000"></div><div><label class="mini muted">Уже выплачено, ₽</label><input id="debtGoalPaid" class="input" type="number" placeholder="0" value="0"></div></div>
+          </div>
+
+          <div style="margin-top:14px;display:flex;justify-content:flex-end"><button class="btn btn-primary" id="addGoalBtn">Добавить цель</button></div>
         </div>
       </div>
     </div>
