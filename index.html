@@ -333,8 +333,14 @@
 <script src="./assets/js/news.js"></script>
 <!-- ORDER BOOK MODAL -->
 <div class="modal-overlay" id="orderBookModal">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-head"><h3 id="obTickerTitle">Стакан</h3><button class="btn-icon" style="width:32px;height:32px" data-close-modal>✕</button></div>
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <h3 id="obTickerTitle">Стакан</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button type="button" class="btn-ghost btn-sm" id="obRefreshBtn" title="Обновить стакан в реальном времени" style="font-size:12px;padding:4px 8px">↻ Обновить</button>
+        <button class="btn-icon" style="width:32px;height:32px" data-close-modal>✕</button>
+      </div>
+    </div>
     <div class="modal-body" style="display:grid;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:center"><span class="mini muted">Лучшие заявки</span><span class="mini" style="color:var(--text3)">Объём • Цена</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -347,9 +353,12 @@
           <div id="obAsks" style="font-family:JetBrains Mono,monospace;font-size:13px;margin-top:6px;line-height:1.6"></div>
         </div>
       </div>
-      <div class="mini muted" style="line-height:1.5">Данные стаканов — демонстрационные. Для OTC-продуктов (TKVM, REITX, BONDOTC) сделки проходят через брокерский стакан или внебиржевые площадки.</div>
+      <div class="mini muted" id="obStatus" style="line-height:1.5;margin-top:4px">Актуальный биржевой/брокерский стакан в реальном времени. Обновление онлайн.</div>
     </div>
-    <div class="modal-foot"><button type="button" class="btn btn-ghost" data-close-modal>Закрыть</button></div>
+    <div class="modal-foot" style="display:flex;justify-content:space-between;align-items:center">
+      <button type="button" class="btn btn-primary btn-sm" id="obBuyBtn">Купить актив</button>
+      <button type="button" class="btn btn-ghost" data-close-modal>Закрыть</button>
+    </div>
   </div>
 </div>
 

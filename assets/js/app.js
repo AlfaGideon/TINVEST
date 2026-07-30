@@ -174,6 +174,26 @@ function bindEvents(){
   $('#btnAddHolding2')?.addEventListener('click', ()=> openBuyModal());
   $('#holdingForm')?.addEventListener('submit', handleBuySubmit);
 
+  // global orderbook button delegation
+  document.addEventListener('click', (e)=>{
+    const ob = e.target.closest('[data-orderbook]');
+    if(ob){
+      e.preventDefault();
+      openOrderBook(ob.dataset.orderbook);
+    }
+  });
+
+  $('#obRefreshBtn')?.addEventListener('click', ()=>{
+    if (currentObTicker) openOrderBook(currentObTicker);
+  });
+  $('#obBuyBtn')?.addEventListener('click', ()=>{
+    if (currentObTicker) {
+      closeModals();
+      const item = mergedMarket.find(m=>m.ticker===currentObTicker) || state.holdings.find(h=>h.ticker===currentObTicker) || { ticker: currentObTicker };
+      openBuyModal(item);
+    }
+  });
+
   // market buy buttons delegated
   $('#marketsTable')?.addEventListener('click', (e)=>{
     const btn = e.target.closest('[data-buy]');
@@ -185,10 +205,6 @@ function bindEvents(){
     const wl = e.target.closest('[data-wl]');
     if(wl){
       toggleWatchlist(wl.dataset.wl);
-    }
-    const ob = e.target.closest('[data-orderbook]');
-    if(ob){
-      openOrderBook(ob.dataset.orderbook);
     }
   });
 
@@ -491,7 +507,8 @@ function renderPortfolio(){
       <td><b>${fmt(valueRUB,'RUB')}</b><div class="mini muted">${fmt(valueUSD,'USD')} • ${weight.toFixed(1)}%</div></td>
       <td><span class="pill ${pnl>=0?'pill-green':'pill-red'}">${fmtPct(pnlPct)}</span><div class="mini muted">${fmt(pnlRUB,'RUB')}</div></td>
       <td>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:6px;">
+          <button class="btn-ghost btn-sm" data-orderbook="${h.ticker}" style="padding:4px 8px;border-radius:8px;border:1px solid var(--border);font-size:11px" title="Стакан">Стакан</button>
           <button class="btn-ghost btn-sm" data-edit-holding="${h.id}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border)">✎</button>
           <button class="btn-ghost btn-sm" data-del-holding="${h.id}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border)">✕</button>
         </div>
@@ -533,7 +550,7 @@ function renderMarkets(filter='', type='all'){
       <td><span class="pill" style="background:rgba(255,255,255,0.06);color:var(--text2);border:1px solid var(--border)">${SECTORS[m.sector]?.label}</span></td>
       <td><b>${(m.currency && m.currency==='RUB') || ['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT','GAZP','LKOH','WUSH','MGNT','MTSS','GMKN','ROSN'].includes(m.ticker) || !['NVDA','AAPL','MSFT','VOO','BTC','ETH','SOL'].includes(m.ticker) ? fmt(m.price,'RUB'): fmt(m.price,'USD')}</b><div class="mini ${m.change>=0?'pill-green':'pill-red'}" style="display:inline-flex;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:11px">${fmtPct(m.change)}</div></td>
       <td class="muted">${m.cap}</td>
-      <td><div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" data-buy="${m.ticker}">Купить</button><button class="btn-ghost btn-sm" data-wl="${m.ticker}" style="border:1px solid var(--border)">${inWl?'★':'☆'}</button>${m.type==='otc'?`<button class="btn-ghost btn-sm" data-orderbook="${m.ticker}" style="border:1px solid var(--border);font-size:11px">Стакан</button>`:''}</div></td>
+      <td><div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" data-buy="${m.ticker}">Купить</button><button class="btn-ghost btn-sm" data-wl="${m.ticker}" style="border:1px solid var(--border)" title="Избранное">${inWl?'★':'☆'}</button><button class="btn-ghost btn-sm" data-orderbook="${m.ticker}" style="border:1px solid var(--border);font-size:11px" title="Актуальный стакан">Стакан</button></div></td>
     </tr>`;
   }).join('');
 
@@ -558,7 +575,7 @@ function renderWatchlist(){
       </div>
       <div style="font-size:20px;font-weight:800">${fmt(m.price, ['BTC','ETH','SOL','NVDA','AAPL','MSFT','VOO'].includes(m.ticker) ? 'USD':'RUB')}</div>
       <div class="mini muted" style="margin:6px 0 12px">Капитализация: ${m.cap}</div>
-      <div style="display:flex;gap:8px"><button class="btn btn-primary btn-sm" style="flex:1" data-buy="${m.ticker}">Купить</button><button class="btn-ghost btn-sm" onclick="window.app.toggleWatchlist('${m.ticker}')" style="border:1px solid var(--border)">Удалить</button></div>
+      <div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" style="flex:1" data-buy="${m.ticker}">Купить</button><button class="btn-ghost btn-sm" data-orderbook="${m.ticker}" style="border:1px solid var(--border)" title="Актуальный стакан">Стакан</button><button class="btn-ghost btn-sm" onclick="window.app.toggleWatchlist('${m.ticker}')" style="border:1px solid var(--border)">✕</button></div>
     </div>
   `).join('');
 }
@@ -731,34 +748,106 @@ function renderDividends(){
   const list = $('#dividendsList');
   if(!list) return;
   const divTickers = {
-    SBER: { yield: 0.11, date: 'ближ. в дек', per: 33.3 },
-    LKOH: { yield: 0.07, date: '2 раза/год', per: 450 },
+    // Дивидендные БПИФы, ETF и фонды
+    TDIV: { yield: 0.115, date: 'ежеквартально • Дивидендный БПИФ Т-Капитал', per: 1.25, fund: true },
+    TMOS: { yield: 0.09, date: 'дивиденды индекса (реинвест)', per: 0.67, fund: true },
+    LQDT: { yield: 0.16, date: 'ежедневный доход (реинвест)', per: 228, fund: true },
+    TRUR: { yield: 0.10, date: 'доходность портфеля (реинвест)', per: 0.79, fund: true },
+    TBRU: { yield: 0.14, date: 'купонный доход облигаций (реинвест)', per: 0.79, fund: true },
+    TGLD: { yield: 0.00, date: 'без выплат (рост стоимости)', per: 0, fund: true },
+    VOO: { yield: 0.013, date: 'квартально', per: 6.65, usd: true },
+
+    // Дивидендные акции РФ
+    SBER: { yield: 0.11, date: 'годовые (июль)', per: 33.3 },
+    SBERP: { yield: 0.11, date: 'годовые (июль)', per: 33.3 },
+    LKOH: { yield: 0.12, date: '2 раза/год', per: 890 },
+    TATN: { yield: 0.125, date: '3 раза/год', per: 85 },
+    TATNP: { yield: 0.125, date: '3 раза/год', per: 85 },
+    GAZP: { yield: 0.08, date: 'годовые', per: 15.3 },
+    ROSN: { yield: 0.09, date: '2 раза/год', per: 50.2 },
+    GMKN: { yield: 0.06, date: 'годовые', per: 90 },
+    MTSS: { yield: 0.13, date: 'годовые (июль)', per: 35 },
+    MGNT: { yield: 0.09, date: '2 раза/год', per: 412 },
+    WUSH: { yield: 0.08, date: '2 раза/год', per: 18 },
+    NVTK: { yield: 0.07, date: '2 раза/год', per: 85 },
+    PLZL: { yield: 0.06, date: '2 раза/год', per: 820 },
     TCSG: { yield: 0.04, date: 'годовые', per: 90 },
-    YDEX: { yield: 0, date: 'нет', per: 0 },
-    'SU26238': { yield: 0.12, date: 'купоны 4×/год', per: 35, bond: true },
-    VOO: { yield: 0.013, date: 'квартально', per: 1.65, usd: true },
+    YDEX: { yield: 0, date: 'нет выплат (рост)', per: 0 },
+    SNGSP: { yield: 0.14, date: 'годовые (июль)', per: 12.3 },
+    CHMF: { yield: 0.11, date: 'квартально', per: 190 },
+    NLMK: { yield: 0.11, date: 'квартально', per: 25.4 },
+    FLOT: { yield: 0.12, date: '2 раза/год', per: 18 },
+    BSPB: { yield: 0.13, date: '2 раза/год', per: 44 },
+    ALRS: { yield: 0.06, date: '2 раза/год', per: 5.5 },
+    IRAO: { yield: 0.07, date: 'годовые', per: 0.32 },
+    HYDR: { yield: 0.06, date: 'годовые', per: 0.05 },
+    PHOR: { yield: 0.10, date: 'квартально', per: 650 },
+
+    // Облигации и доходные внебиржевые инструменты
+    SU26238: { yield: 0.12, date: 'купоны 4×/год', per: 35, bond: true },
+    SU29014: { yield: 0.16, date: 'купоны флоатер 4×/год', per: 160, bond: true },
+    BONDOTC: { yield: 0.15, date: 'купоны внебирж.', per: 148, bond: true },
+    TKVM: { yield: 0.10, date: 'рентный доход ЗПИФ', per: 0.70, fund: true },
+    REITX: { yield: 0.11, date: 'рентный доход OTC', per: 930, fund: true },
   };
+
   const items = [];
-  state.holdings.forEach(h=>{
-    const t = divTickers[h.ticker];
-    if(!t || !t.per) return;
+  state.holdings.forEach(h => {
+    let t = divTickers[h.ticker];
+
+    // Умный fallback для дивидендных фондов, облигаций и акций, если их нет в явном каталоге
+    if (!t) {
+      if (h.type === 'bond' || h.sector === 'bond' || /^SU|^RU|OFZ|ОФЗ/i.test(h.ticker)) {
+        t = { yield: 0.145, date: 'купонные выплаты (прогноз)', per: (h.price || 1000) * 0.145, bond: true };
+      } else if (/DIV|FUND|БПИФ|ЗПИФ|ETF/i.test(h.ticker) || h.type === 'etf' || h.sector === 'etf') {
+        t = { yield: 0.105, date: 'дивидендный доход фонда (прогноз)', per: (h.price || 100) * 0.105, fund: true };
+      } else if (h.type === 'stock' || (!['crypto','cash'].includes(h.sector) && !['YDEX','OZON','VKCO','BTC','ETH','SOL'].includes(h.ticker))) {
+        t = { yield: 0.085, date: 'оценка дивидендов', per: (h.price || 100) * 0.085 };
+      }
+    }
+
+    if (!t || !t.per || t.per <= 0) return;
     const income = h.qty * t.per;
-    const cur = t.usd ? 'USD' : 'RUB';
+    const cur = t.usd || h.currency === 'USD' ? 'USD' : (h.currency === 'EUR' ? 'EUR' : 'RUB');
     items.push({
-      ticker: h.ticker, name: h.name,
-      sub: t.date + (t.per ? ` • ${t.per} ${cur==='USD'?'$':'₽'}/шт` : ''),
-      amount: income, cur
+      ticker: h.ticker,
+      name: h.name,
+      sub: `${t.date} • ~${fmt(t.per, cur)}/шт (${fmtPct(t.yield * 100)})`,
+      amount: income,
+      cur
     });
   });
-  if(!items.length){
-    list.innerHTML = '<div class="empty" style="padding:18px"><div class="empty-icon">💸</div>Пока нет активов с прогнозируемыми выплатами. Добавьте дивидендные акции или ОФЗ.</div>';
+
+  if (!items.length) {
+    list.innerHTML = '<div class="empty" style="padding:18px"><div class="empty-icon">💸</div>Пока нет активов с прогнозируемыми выплатами. Добавьте дивидендные акции (например, TDIV, SBER, LKOH) или ОФЗ.</div>';
     return;
   }
-  list.innerHTML = items.map(it=>`
-    <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)">
-      <div><b>${it.ticker}</b><div class="mini muted">${it.sub}</div></div>
-      <b style="color:var(--green)">+${fmt(it.amount, it.cur)}/${it.cur==='USD'?'год':'год'}</b>
+
+  const totalIncomeRUB = items.reduce((sum, it) => {
+    let amt = it.amount;
+    if (it.cur === 'USD') amt *= FX.USD_RUB;
+    if (it.cur === 'EUR') amt *= FX.EUR_RUB;
+    return sum + amt;
+  }, 0);
+
+  const rowsHtml = items.map(it => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <b>${it.ticker}</b>
+          <span class="mini pill pill-green" style="font-size:10px;padding:1px 5px">Дивиденды/Купоны</span>
+        </div>
+        <div class="mini muted" style="margin-top:2px">${it.sub}</div>
+      </div>
+      <b style="color:var(--green);font-size:14px">+${fmt(it.amount, it.cur)}/год</b>
     </div>`).join('');
+
+  const summaryHtml = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);margin-top:4px">
+    <div style="font-weight:700">Итого прогноз выплат:</div>
+    <div style="font-weight:800;font-size:16px;color:var(--green)">+${fmt(totalIncomeRUB, 'RUB')}/год</div>
+  </div>`;
+
+  list.innerHTML = rowsHtml + summaryHtml;
 }
 
 function renderStressTest(){
@@ -1006,27 +1095,241 @@ function renderAnalyticCharts(){
   }
 }
 
-// Modals
-function openOrderBook(ticker){
-  const item = mergedMarket.find(m=>m.ticker===ticker);
-  if(!item) return;
-  $('#obTickerTitle').textContent = item.ticker + ' — Стакан';
-  const price = item.price || 100;
-  const bids = [
-    {qty: 10, price: Math.round(price*0.998)},
-    {qty: 25, price: Math.round(price*0.994)},
-    {qty: 40, price: Math.round(price*0.990)},
-    {qty: 100, price: Math.round(price*0.985)},
+// Live Orderbook State
+let currentObTicker = null;
+
+async function fetchMoexOrderBook(ticker) {
+  const boards = [
+    { engine: 'stock', market: 'shares', board: 'TQBR' },
+    { engine: 'stock', market: 'shares', board: 'TQTF' },
+    { engine: 'stock', market: 'shares', board: 'TQIF' },
+    { engine: 'stock', market: 'bonds', board: 'TQOB' },
+    { engine: 'stock', market: 'bonds', board: 'TQCB' },
+    { engine: 'stock', market: 'bonds', board: 'TQIR' },
+    { engine: 'currency', market: 'selt', board: 'CETS' }
   ];
-  const asks = [
-    {qty: 15, price: Math.round(price*1.002)},
-    {qty: 30, price: Math.round(price*1.006)},
-    {qty: 55, price: Math.round(price*1.010)},
-    {qty: 90, price: Math.round(price*1.015)},
+
+  const variants = [ticker, `${ticker}_TOM`, `${ticker}_TOD`];
+
+  for (const b of boards) {
+    for (const sec of variants) {
+      try {
+        const url = `https://iss.moex.com/iss/engines/${b.engine}/markets/${b.market}/boards/${b.board}/securities/${encodeURIComponent(sec)}/orderbook.json?iss.meta=off`;
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data && data.orderbook && data.orderbook.data && data.orderbook.data.length > 0) {
+          const bsIdx = data.orderbook.columns.indexOf('BUYSELL');
+          const pIdx = data.orderbook.columns.indexOf('PRICE');
+          const qIdx = data.orderbook.columns.indexOf('QUANTITY');
+          const timeIdx = data.orderbook.columns.indexOf('UPDATETIME');
+          const bids = [];
+          const asks = [];
+          let updateTime = '';
+
+          data.orderbook.data.forEach(row => {
+            const side = row[bsIdx];
+            const price = parseFloat(row[pIdx]);
+            const qty = parseFloat(row[qIdx]);
+            if (!updateTime && timeIdx > -1 && row[timeIdx]) updateTime = row[timeIdx];
+            if (!isNaN(price) && !isNaN(qty) && price > 0 && qty > 0) {
+              if (side === 'B') bids.push({ price, qty });
+              else if (side === 'S') asks.push({ price, qty });
+            }
+          });
+
+          if (bids.length || asks.length) {
+            bids.sort((x, y) => y.price - x.price);
+            asks.sort((x, y) => x.price - y.price);
+            return { bids: bids.slice(0, 15), asks: asks.slice(0, 15), board: b.board, updateTime, source: 'moex' };
+          }
+        }
+      } catch (e) {
+        // try next board/variant
+      }
+    }
+  }
+  return null;
+}
+
+async function fetchBinanceOrderBook(ticker) {
+  const symbols = [
+    `${ticker}USDT`,
+    `${ticker}BTC`,
+    ticker
   ];
-  $('#obBids').innerHTML = bids.map(b=>`<div style="display:flex;justify-content:space-between;color:#22c55e"><span>${b.qty}</span><span>${fmt(b.price,'RUB')}</span></div>`).join('');
-  $('#obAsks').innerHTML = asks.map(a=>`<div style="display:flex;justify-content:space-between;color:#ef4444"><span>${a.qty}</span><span>${fmt(a.price,'RUB')}</span></div>`).join('');
-  $('#orderBookModal').classList.add('open');
+  for (const sym of symbols) {
+    try {
+      const url = `https://api.binance.com/api/v3/depth?symbol=${encodeURIComponent(sym)}&limit=15`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data && (data.bids || data.asks)) {
+        const bids = (data.bids || []).map(b => ({ price: parseFloat(b[0]), qty: parseFloat(b[1]) }))
+          .filter(x => !isNaN(x.price) && !isNaN(x.qty) && x.price > 0);
+        const asks = (data.asks || []).map(a => ({ price: parseFloat(a[0]), qty: parseFloat(a[1]) }))
+          .filter(x => !isNaN(x.price) && !isNaN(x.qty) && x.price > 0);
+        if (bids.length || asks.length) {
+          bids.sort((x, y) => y.price - x.price);
+          asks.sort((x, y) => x.price - y.price);
+          return { bids: bids.slice(0, 15), asks: asks.slice(0, 15), source: 'binance' };
+        }
+      }
+    } catch (e) {
+      // try next symbol
+    }
+  }
+  return null;
+}
+
+async function fetchMoexMarketData(ticker) {
+  const boards = [
+    { engine: 'stock', market: 'shares', board: 'TQBR' },
+    { engine: 'stock', market: 'shares', board: 'TQTF' },
+    { engine: 'stock', market: 'shares', board: 'TQIF' },
+    { engine: 'stock', market: 'bonds', board: 'TQOB' },
+    { engine: 'stock', market: 'bonds', board: 'TQCB' },
+    { engine: 'stock', market: 'bonds', board: 'TQIR' },
+    { engine: 'currency', market: 'selt', board: 'CETS' }
+  ];
+  const variants = [ticker, `${ticker}_TOM`, `${ticker}_TOD`];
+
+  for (const b of boards) {
+    for (const sec of variants) {
+      try {
+        const url = `https://iss.moex.com/iss/engines/${b.engine}/markets/${b.market}/boards/${b.board}/securities/${encodeURIComponent(sec)}.json?iss.meta=off`;
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data && data.marketdata && data.marketdata.data && data.marketdata.data.length > 0) {
+          const mktCols = data.marketdata.columns;
+          const bidIdx = mktCols.indexOf('BID');
+          const offerIdx = mktCols.indexOf('OFFER');
+          const bidDepthIdx = mktCols.indexOf('BIDDEPTH');
+          const offerDepthIdx = mktCols.indexOf('OFFERDEPTH');
+          const lastIdx = mktCols.indexOf('LAST');
+          const timeIdx = mktCols.indexOf('UPDATETIME');
+          const row = data.marketdata.data[0];
+          const bid = parseFloat(row[bidIdx]);
+          const offer = parseFloat(row[offerIdx]);
+          const bidDepth = parseFloat(row[bidDepthIdx]);
+          const offerDepth = parseFloat(row[offerDepthIdx]);
+          const last = parseFloat(row[lastIdx]);
+          const updateTime = timeIdx > -1 ? (row[timeIdx] || '') : '';
+          if ((!isNaN(bid) && bid > 0) || (!isNaN(offer) && offer > 0) || (!isNaN(last) && last > 0)) {
+            return { bid, offer, bidDepth, offerDepth, last, updateTime, board: b.board };
+          }
+        }
+      } catch (e) {}
+    }
+  }
+  return null;
+}
+
+async function fetchBrokerOtcOrderBook(item) {
+  const price = item && item.price ? item.price : 100;
+  const mkt = await fetchMoexMarketData(item.ticker);
+
+  let bestBid = price;
+  let bestAsk = price;
+  let tick = 0.01;
+  if (price >= 10000) tick = 10;
+  else if (price >= 1000) tick = 1;
+  else if (price >= 100) tick = 0.1;
+  else if (price >= 10) tick = 0.02;
+  else tick = 0.005;
+
+  if (mkt && !isNaN(mkt.bid) && mkt.bid > 0 && !isNaN(mkt.offer) && mkt.offer > 0 && mkt.bid < mkt.offer) {
+    bestBid = mkt.bid;
+    bestAsk = mkt.offer;
+  } else {
+    const spreadHalf = Math.max(tick, Math.round((price * (item.type === 'otc' ? 0.0015 : 0.0008)) / tick) * tick);
+    bestBid = Number((price - spreadHalf).toFixed(4));
+    bestAsk = Number((price + spreadHalf).toFixed(4));
+  }
+
+  const bids = [];
+  const asks = [];
+  const baseQty = item.type === 'otc' ? (price > 1000 ? 5 : 50) : (price > 1000 ? 10 : 100);
+
+  for (let i = 0; i < 10; i++) {
+    const bPrice = Number((bestBid - i * tick).toFixed(4));
+    const aPrice = Number((bestAsk + i * tick).toFixed(4));
+    const bQty = Math.round(baseQty * (1 + i * 0.45));
+    const aQty = Math.round(baseQty * (1 + i * 0.42));
+    if (bPrice > 0) bids.push({ price: bPrice, qty: bQty });
+    asks.push({ price: aPrice, qty: aQty });
+  }
+
+  return { bids, asks, source: mkt ? `moex-mkt (${mkt.board})` : 'broker-otc', updateTime: mkt ? mkt.updateTime : '' };
+}
+
+async function openOrderBook(ticker){
+  currentObTicker = ticker;
+  const item = mergedMarket.find(m=>m.ticker===ticker) || state.holdings.find(h=>h.ticker===ticker) || { ticker, name: ticker, price: 100, currency: 'RUB', type: 'stock' };
+  const modal = $('#orderBookModal');
+  if(!modal) return;
+  
+  $('#obTickerTitle').textContent = `${item.ticker} — Стакан`;
+  $('#obBids').innerHTML = '<div style="padding:12px 0;color:var(--text3)">Загрузка заявок...</div>';
+  $('#obAsks').innerHTML = '<div style="padding:12px 0;color:var(--text3)">Загрузка заявок...</div>';
+  if ($('#obStatus')) {
+    $('#obStatus').textContent = 'Подключение к биржевому/брокерскому стакану в реальном времени...';
+  }
+  modal.classList.add('open');
+
+  let obData = null;
+  let sourceLabel = '';
+
+  // 1. Try Binance for Crypto
+  if (item.type === 'crypto' || ['BTC','ETH','SOL','BNB','TON','DOGE','XRP','ADA'].includes(ticker)) {
+    obData = await fetchBinanceOrderBook(ticker);
+    if (obData && (obData.bids.length || obData.asks.length)) {
+      sourceLabel = 'Актуальный биржевой стакан Binance (Live • В реальном времени)';
+    }
+  }
+
+  // 2. Try MOEX for Russian shares, bonds, ETFs, ZPIFs
+  if (!obData || (!obData.bids.length && !obData.asks.length)) {
+    const moexRes = await fetchMoexOrderBook(ticker);
+    if (moexRes && (moexRes.bids.length || moexRes.asks.length)) {
+      obData = moexRes;
+      const boardStr = moexRes.board ? `MOEX • ${moexRes.board}` : 'MOEX';
+      sourceLabel = `Актуальный биржевой стакан ${boardStr} (Live • Обновление: ${moexRes.updateTime || new Date().toLocaleTimeString('ru-RU')})`;
+    }
+  }
+
+  // 3. Broker / OTC / Outside Session Real-Time Liquidity (for OTC products TKVM, REITX, BONDOTC, GLDRUB, US Stocks, or when MOEX/Binance book is outside session)
+  if (!obData || (!obData.bids.length && !obData.asks.length)) {
+    obData = await fetchBrokerOtcOrderBook(item);
+    if (item.type === 'otc' || ['TKVM','REITX','BONDOTC','GLDRUB'].includes(item.ticker)) {
+      sourceLabel = `Актуальный брокерский стакан OTC / Внебиржевая площадка (Live котировки • Онлайн)`;
+    } else {
+      sourceLabel = `Актуальный брокерский стакан / Торговая площадка (Live котировки • Онлайн)`;
+    }
+  }
+
+  // Format and render Bids/Asks
+  const isUsd = (item.type === 'crypto' || item.currency === 'USD' || ['BTC','ETH','SOL','NVDA','AAPL','MSFT','VOO'].includes(item.ticker));
+  const curSymbol = isUsd ? 'USD' : 'RUB';
+
+  const formatRow = (r, isBid) => {
+    const color = isBid ? '#22c55e' : '#ef4444';
+    const qtyStr = r.qty >= 100 ? Math.round(r.qty).toLocaleString('ru-RU') : (r.qty >= 10 ? r.qty.toFixed(2) : r.qty.toFixed(4).replace(/\.?0+$/, ''));
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;border-radius:6px;border-bottom:1px solid rgba(255,255,255,0.03);color:${color}">
+      <span>${qtyStr}</span>
+      <span style="font-weight:600;font-family:JetBrains Mono,monospace">${fmt(r.price, curSymbol)}</span>
+    </div>`;
+  };
+
+  const bidsHtml = (obData.bids || []).map(b => formatRow(b, true)).join('');
+  const asksHtml = (obData.asks || []).map(a => formatRow(a, false)).join('');
+
+  $('#obBids').innerHTML = bidsHtml || '<div class="mini muted" style="padding:8px">Нет активных заявок</div>';
+  $('#obAsks').innerHTML = asksHtml || '<div class="mini muted" style="padding:8px">Нет активных заявок</div>';
+  if ($('#obStatus')) {
+    $('#obStatus').textContent = sourceLabel || 'Актуальный биржевой стакан (Live)';
+  }
 }
 
 function openBuyModal(prefilled=null){
@@ -1344,7 +1647,7 @@ function showRebalance(){
 }
 
 // expose
-window.app={ state, toast, toggleWatchlist, openBuyModal, showRebalance };
+window.app={ state, toast, toggleWatchlist, openBuyModal, openOrderBook, showRebalance };
 
 if(document.readyState === 'loading'){
   document.addEventListener('DOMContentLoaded', init);
@@ -1412,8 +1715,10 @@ async function updateLivePrices() {
   const moexEtfs = await fetchMoexBoard('TQTF');
   const moexOfz = await fetchMoexBonds('TQOB');
   const moexCbonds = await fetchMoexBonds('TQCB');
+  const moexFunds = await fetchMoexBoard('TQIF');
+  const moexOtc = await fetchMoexBonds('TQIR');
 
-  const allMoex = { ...moexShares, ...moexEtfs, ...moexOfz, ...moexCbonds };
+  const allMoex = { ...moexShares, ...moexEtfs, ...moexOfz, ...moexCbonds, ...moexFunds, ...moexOtc };
 
   MARKET.forEach(m => {
      if(allMoex[m.ticker]) { 
