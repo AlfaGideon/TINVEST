@@ -1,4 +1,4 @@
-import { MARKET, DEFAULT_HOLDINGS, FX, SECTORS, generateHistory } from './data.js';
+const { MARKET, DEFAULT_HOLDINGS, FX, SECTORS, generateHistory } = window.TINVEST_DATA;
 
 const STORAGE_KEY = 'tinvest_v2';
 let state = loadState();
