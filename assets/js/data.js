@@ -1,5 +1,5 @@
 (function() {
-const FX = { USD_RUB: 92.4, EUR_RUB: 100.2 };
+const FX = { USD_RUB: 78.7, EUR_RUB: 89.63 };
 
 const SECTORS = {
   tech: { label: 'Технологии', color: '#4f7cff' },
@@ -20,6 +20,12 @@ const MARKET = [
   { ticker:'YDEX', name:'Яндекс', price:4125, change:-0.87, sector:'tech', type:'stock', cap:'1.5T RUB', icon:'Я', color:'#ff0000' },
   { ticker:'TCSG', name:'Тинькофф', price:3240, change:2.01, sector:'finance', type:'stock', cap:'0.6T RUB', icon:'Т', color:'#ffdd2d' },
   { ticker:'LKOH', name:'Лукойл', price:7420, change:0.45, sector:'energy', type:'stock', cap:'5.2T RUB', icon:'Л', color:'#e30613' },
+  { ticker:'GAZP', name:'Газпром', price:128.4, change:-0.32, sector:'energy', type:'stock', cap:'3.0T RUB', icon:'Г', color:'#007cc2' },
+  { ticker:'WUSH', name:'Whoosh', price:211.5, change:1.24, sector:'consumer', type:'stock', cap:'23.5B RUB', icon:'W', color:'#ffcc00' },
+  { ticker:'MGNT', name:'Магнит', price:5920, change:0.45, sector:'consumer', type:'stock', cap:'0.6T RUB', icon:'М', color:'#e30613' },
+  { ticker:'MTSS', name:'МТС', price:288.4, change:0.12, sector:'tech', type:'stock', cap:'0.5T RUB', icon:'МТ', color:'#ff0000' },
+  { ticker:'GMKN', name:'Норникель', price:148.2, change:-0.87, sector:'energy', type:'stock', cap:'2.3T RUB', icon:'НК', color:'#004a99' },
+  { ticker:'ROSN', name:'Роснефть', price:562.4, change:0.65, sector:'energy', type:'stock', cap:'6.0T RUB', icon:'Р', color:'#ffcc00' },
   { ticker:'VOO', name:'Vanguard S&P 500', price:512.3, change:0.62, sector:'etf', type:'etf', cap:'450B', icon:'V', color:'#6b21a8' },
   { ticker:'TMOS', name:'Тинькофф iMOEX', price:7.42, change:0.95, sector:'etf', type:'etf', cap:'82B RUB', icon:'И', color:'#ffdd2d' },
   { ticker:'BTC', name:'Bitcoin', price:68240, change:3.21, sector:'crypto', type:'crypto', cap:'1.34T', icon:'₿', color:'#f7931a' },
