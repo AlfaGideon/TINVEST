@@ -748,34 +748,106 @@ function renderDividends(){
   const list = $('#dividendsList');
   if(!list) return;
   const divTickers = {
-    SBER: { yield: 0.11, date: 'ближ. в дек', per: 33.3 },
-    LKOH: { yield: 0.07, date: '2 раза/год', per: 450 },
+    // Дивидендные БПИФы, ETF и фонды
+    TDIV: { yield: 0.115, date: 'ежеквартально • Дивидендный БПИФ Т-Капитал', per: 1.25, fund: true },
+    TMOS: { yield: 0.09, date: 'дивиденды индекса (реинвест)', per: 0.67, fund: true },
+    LQDT: { yield: 0.16, date: 'ежедневный доход (реинвест)', per: 228, fund: true },
+    TRUR: { yield: 0.10, date: 'доходность портфеля (реинвест)', per: 0.79, fund: true },
+    TBRU: { yield: 0.14, date: 'купонный доход облигаций (реинвест)', per: 0.79, fund: true },
+    TGLD: { yield: 0.00, date: 'без выплат (рост стоимости)', per: 0, fund: true },
+    VOO: { yield: 0.013, date: 'квартально', per: 6.65, usd: true },
+
+    // Дивидендные акции РФ
+    SBER: { yield: 0.11, date: 'годовые (июль)', per: 33.3 },
+    SBERP: { yield: 0.11, date: 'годовые (июль)', per: 33.3 },
+    LKOH: { yield: 0.12, date: '2 раза/год', per: 890 },
+    TATN: { yield: 0.125, date: '3 раза/год', per: 85 },
+    TATNP: { yield: 0.125, date: '3 раза/год', per: 85 },
+    GAZP: { yield: 0.08, date: 'годовые', per: 15.3 },
+    ROSN: { yield: 0.09, date: '2 раза/год', per: 50.2 },
+    GMKN: { yield: 0.06, date: 'годовые', per: 90 },
+    MTSS: { yield: 0.13, date: 'годовые (июль)', per: 35 },
+    MGNT: { yield: 0.09, date: '2 раза/год', per: 412 },
+    WUSH: { yield: 0.08, date: '2 раза/год', per: 18 },
+    NVTK: { yield: 0.07, date: '2 раза/год', per: 85 },
+    PLZL: { yield: 0.06, date: '2 раза/год', per: 820 },
     TCSG: { yield: 0.04, date: 'годовые', per: 90 },
-    YDEX: { yield: 0, date: 'нет', per: 0 },
-    'SU26238': { yield: 0.12, date: 'купоны 4×/год', per: 35, bond: true },
-    VOO: { yield: 0.013, date: 'квартально', per: 1.65, usd: true },
+    YDEX: { yield: 0, date: 'нет выплат (рост)', per: 0 },
+    SNGSP: { yield: 0.14, date: 'годовые (июль)', per: 12.3 },
+    CHMF: { yield: 0.11, date: 'квартально', per: 190 },
+    NLMK: { yield: 0.11, date: 'квартально', per: 25.4 },
+    FLOT: { yield: 0.12, date: '2 раза/год', per: 18 },
+    BSPB: { yield: 0.13, date: '2 раза/год', per: 44 },
+    ALRS: { yield: 0.06, date: '2 раза/год', per: 5.5 },
+    IRAO: { yield: 0.07, date: 'годовые', per: 0.32 },
+    HYDR: { yield: 0.06, date: 'годовые', per: 0.05 },
+    PHOR: { yield: 0.10, date: 'квартально', per: 650 },
+
+    // Облигации и доходные внебиржевые инструменты
+    SU26238: { yield: 0.12, date: 'купоны 4×/год', per: 35, bond: true },
+    SU29014: { yield: 0.16, date: 'купоны флоатер 4×/год', per: 160, bond: true },
+    BONDOTC: { yield: 0.15, date: 'купоны внебирж.', per: 148, bond: true },
+    TKVM: { yield: 0.10, date: 'рентный доход ЗПИФ', per: 0.70, fund: true },
+    REITX: { yield: 0.11, date: 'рентный доход OTC', per: 930, fund: true },
   };
+
   const items = [];
-  state.holdings.forEach(h=>{
-    const t = divTickers[h.ticker];
-    if(!t || !t.per) return;
+  state.holdings.forEach(h => {
+    let t = divTickers[h.ticker];
+
+    // Умный fallback для дивидендных фондов, облигаций и акций, если их нет в явном каталоге
+    if (!t) {
+      if (h.type === 'bond' || h.sector === 'bond' || /^SU|^RU|OFZ|ОФЗ/i.test(h.ticker)) {
+        t = { yield: 0.145, date: 'купонные выплаты (прогноз)', per: (h.price || 1000) * 0.145, bond: true };
+      } else if (/DIV|FUND|БПИФ|ЗПИФ|ETF/i.test(h.ticker) || h.type === 'etf' || h.sector === 'etf') {
+        t = { yield: 0.105, date: 'дивидендный доход фонда (прогноз)', per: (h.price || 100) * 0.105, fund: true };
+      } else if (h.type === 'stock' || (!['crypto','cash'].includes(h.sector) && !['YDEX','OZON','VKCO','BTC','ETH','SOL'].includes(h.ticker))) {
+        t = { yield: 0.085, date: 'оценка дивидендов', per: (h.price || 100) * 0.085 };
+      }
+    }
+
+    if (!t || !t.per || t.per <= 0) return;
     const income = h.qty * t.per;
-    const cur = t.usd ? 'USD' : 'RUB';
+    const cur = t.usd || h.currency === 'USD' ? 'USD' : (h.currency === 'EUR' ? 'EUR' : 'RUB');
     items.push({
-      ticker: h.ticker, name: h.name,
-      sub: t.date + (t.per ? ` • ${t.per} ${cur==='USD'?'$':'₽'}/шт` : ''),
-      amount: income, cur
+      ticker: h.ticker,
+      name: h.name,
+      sub: `${t.date} • ~${fmt(t.per, cur)}/шт (${fmtPct(t.yield * 100)})`,
+      amount: income,
+      cur
     });
   });
-  if(!items.length){
-    list.innerHTML = '<div class="empty" style="padding:18px"><div class="empty-icon">💸</div>Пока нет активов с прогнозируемыми выплатами. Добавьте дивидендные акции или ОФЗ.</div>';
+
+  if (!items.length) {
+    list.innerHTML = '<div class="empty" style="padding:18px"><div class="empty-icon">💸</div>Пока нет активов с прогнозируемыми выплатами. Добавьте дивидендные акции (например, TDIV, SBER, LKOH) или ОФЗ.</div>';
     return;
   }
-  list.innerHTML = items.map(it=>`
-    <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)">
-      <div><b>${it.ticker}</b><div class="mini muted">${it.sub}</div></div>
-      <b style="color:var(--green)">+${fmt(it.amount, it.cur)}/${it.cur==='USD'?'год':'год'}</b>
+
+  const totalIncomeRUB = items.reduce((sum, it) => {
+    let amt = it.amount;
+    if (it.cur === 'USD') amt *= FX.USD_RUB;
+    if (it.cur === 'EUR') amt *= FX.EUR_RUB;
+    return sum + amt;
+  }, 0);
+
+  const rowsHtml = items.map(it => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <b>${it.ticker}</b>
+          <span class="mini pill pill-green" style="font-size:10px;padding:1px 5px">Дивиденды/Купоны</span>
+        </div>
+        <div class="mini muted" style="margin-top:2px">${it.sub}</div>
+      </div>
+      <b style="color:var(--green);font-size:14px">+${fmt(it.amount, it.cur)}/год</b>
     </div>`).join('');
+
+  const summaryHtml = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);margin-top:4px">
+    <div style="font-weight:700">Итого прогноз выплат:</div>
+    <div style="font-weight:800;font-size:16px;color:var(--green)">+${fmt(totalIncomeRUB, 'RUB')}/год</div>
+  </div>`;
+
+  list.innerHTML = rowsHtml + summaryHtml;
 }
 
 function renderStressTest(){

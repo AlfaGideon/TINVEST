@@ -42,6 +42,10 @@ const MARKET = [
   { ticker:'TKVM', name:'Кв. метры (TKVM)', price:7.04, change:0.85, sector:'realestate', type:'otc', cap:'-', icon:'TK', color:'#8b5cf6' },
   { ticker:'REITX', name:'Недвижимость OTC', price:8450, change:-0.12, sector:'realestate', type:'otc', cap:'-', icon:'RE', color:'#8b5cf6' },
   { ticker:'BONDOTC', name:'Облигация внебирж.', price:987, change:0.05, sector:'bond', type:'otc', cap:'-', icon:'BO', color:'#06b6d4' },
+  { ticker:'TDIV', name:'Т-Капитал Дивидендные акции', price:10.85, change:0.75, sector:'etf', type:'etf', cap:'28B RUB', icon:'ТД', color:'#ffdd2d' },
+  { ticker:'TRUR', name:'Т-Капитал Вечный портфель RUB', price:7.92, change:0.15, sector:'etf', type:'etf', cap:'45B RUB', icon:'ТР', color:'#ffdd2d' },
+  { ticker:'TBRU', name:'Т-Капитал Облигации RUB', price:5.64, change:0.22, sector:'bond', type:'etf', cap:'18B RUB', icon:'ТО', color:'#06b6d4' },
+  { ticker:'TGLD', name:'Т-Капитал Золото', price:9.45, change:0.41, sector:'energy', type:'etf', cap:'22B RUB', icon:'ТЗ', color:'#f59e0b' },
 ];
 
 const DEFAULT_HOLDINGS = [];
