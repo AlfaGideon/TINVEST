@@ -31,6 +31,7 @@
         <a class="nav-item" data-view="portfolio" href="#"><span>💼</span> Портфель</a>
         <a class="nav-item" data-view="markets" href="#"><span>📈</span> Рынки</a>
         <a class="nav-item" data-view="analytics" href="#"><span>🧠</span> AI Аналитика</a>
+        <a class="nav-item" data-view="signals" href="#"><span>📰</span> Сигналы & Новости <span class="badge" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">Hot</span></a>
       </div>
       <div class="nav-section">
         <div class="nav-label">Планирование</div>
@@ -137,7 +138,12 @@
             <button class="btn btn-ghost" style="width:100%;margin-top:8px" data-view-trigger="analytics">Открыть аналитику →</button>
           </div>
         </div>
+
+        <div class="card" id="dashNewsWidget" style="margin-top:16px"></div>
       </div>
+
+      <!-- SIGNALS & NEWS -->
+      <div class="view" id="view-signals"></div>
 
       <!-- PORTFOLIO -->
       <div class="view" id="view-portfolio">
@@ -324,6 +330,7 @@
 </div>
 
 <script src="./assets/js/data.js"></script>
+<script src="./assets/js/news.js"></script>
 <!-- ORDER BOOK MODAL -->
 <div class="modal-overlay" id="orderBookModal">
   <div class="modal" style="max-width:420px">

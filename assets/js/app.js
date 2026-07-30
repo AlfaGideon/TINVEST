@@ -134,6 +134,7 @@ function renderNav(){
       if(view==='dashboard') setTimeout(()=>renderCharts(true), 100);
       if(view==='portfolio') { renderPortfolio(); setTimeout(()=>renderAllocChart(true),100); }
       if(view==='analytics') setTimeout(()=>renderAnalyticCharts(),100);
+      if(view==='signals' && window.TINVEST_NEWS) window.TINVEST_NEWS.renderNewsView();
       window.scrollTo(0,0);
     });
   });
@@ -286,8 +287,9 @@ function bindEvents(){
     const btn = e.target.closest('[data-rec-action]');
     if(!btn) return;
     const action = btn.dataset.recAction;
-    if(action==='Купить LQDT'){
-      const item = mergedMarket.find(m=>m.ticker==='LQDT');
+    if(action.startsWith('Купить ')){
+      const ticker = action.replace('Купить ', '').trim();
+      const item = mergedMarket.find(m=>m.ticker===ticker) || { ticker, name: ticker, price: 100 };
       if(item) openBuyModal(item);
     } else if(action==='Ребалансировать'){
       showRebalance();
@@ -329,11 +331,17 @@ function renderAll(){
   // topbar KPI
   $('#kpiTotal') && ($('#kpiTotal').textContent = state.settings.showRUB ? fmt(m.totalValueRUB,'RUB') : fmt(m.totalValueUSD,'USD'));
   $('#kpiPnL') && ($('#kpiPnL').textContent = (m.pnl>=0?'+':'')+fmt(m.pnl,'RUB'));
-  $('#kpiPnL').className = 'pill '+(m.pnl>=0?'pill-green':'pill-red');
+  if ($('#kpiPnL')) $('#kpiPnL').className = 'pill '+(m.pnl>=0?'pill-green':'pill-red');
   $('#kpiPct') && ($('#kpiPct').textContent = fmtPct(m.pnlPct));
-  $('#kpiPct').className = 'pill '+(m.pnlPct>=0?'pill-green':'pill-red');
+  if ($('#kpiPct')) $('#kpiPct').className = 'pill '+(m.pnlPct>=0?'pill-green':'pill-red');
 
   renderDashboard();
+  if (window.TINVEST_NEWS) {
+    window.TINVEST_NEWS.renderDashboardNewsWidget();
+    if ($('#view-signals')?.classList.contains('active')) {
+      window.TINVEST_NEWS.renderNewsView();
+    }
+  }
   renderPortfolio();
   renderMarkets($('#searchInput')?.value || '', document.querySelector('.tabs[data-tabs="markets"] .tab.active')?.dataset.tab || 'all');
   renderAnalytics();
@@ -396,12 +404,12 @@ function renderDashboard(){
     }
   }
 
-  $('#dashTotal').textContent = state.settings.showRUB? fmt(m.totalValueRUB,'RUB'):fmt(m.totalValueUSD,'USD');
-  $('#dashCost').textContent = fmt(m.totalCostRUB,'RUB');
-  $('#dashPnlValue').textContent = fmt(m.pnl,'RUB');
-  $('#dashPnlPct').textContent = fmtPct(m.pnlPct);
-  $('#dashPnlPct').className = 'pill '+(m.pnlPct>=0?'pill-green':'pill-red');
-  $('#dashCount').textContent = state.holdings.length+' активов';
+  $('#dashTotal') && ($('#dashTotal').textContent = state.settings.showRUB? fmt(m.totalValueRUB,'RUB'):fmt(m.totalValueUSD,'USD'));
+  $('#dashCost') && ($('#dashCost').textContent = fmt(m.totalCostRUB,'RUB'));
+  $('#dashPnlValue') && ($('#dashPnlValue').textContent = fmt(m.pnl,'RUB'));
+  $('#dashPnlPct') && ($('#dashPnlPct').textContent = fmtPct(m.pnlPct));
+  if ($('#dashPnlPct')) $('#dashPnlPct').className = 'pill '+(m.pnlPct>=0?'pill-green':'pill-red');
+  $('#dashCount') && ($('#dashCount').textContent = state.holdings.length+' активов');
   // sectors/types breakdown
   const sectors = new Set(state.holdings.map(h=>h.sector)).size;
   const types = new Set(state.holdings.map(h=>h.type)).size;
@@ -409,34 +417,38 @@ function renderDashboard(){
   if(brk) brk.textContent = `${sectors} сектор${sectors===1?'':(sectors<5?'а':'ов')} • ${types} класс${types===1?'':(types<5?'а':'ов')}`;
 
   const diversification = calcDiversification();
-  $('#dashRiskScore').textContent = diversification.score+'/100';
-  $('#dashRiskLabel').textContent = ' ' + diversification.label;
-  $('#dashRiskBar').style.width = diversification.score+'%';
+  $('#dashRiskScore') && ($('#dashRiskScore').textContent = diversification.score+'/100');
+  $('#dashRiskLabel') && ($('#dashRiskLabel').textContent = ' ' + diversification.label);
+  $('#dashRiskBar') && ($('#dashRiskBar').style.width = diversification.score+'%');
 
   // top holdings
   const sorted = [...state.holdings].sort((a,b)=> (b.qty*b.price) - (a.qty*a.price)).slice(0,4);
-  if(!sorted.length){
-    $('#dashTopHoldings').innerHTML = '<div class="empty"><div class="empty-icon">💼</div>Портфель пуст. Нажмите «Купить» вверху или добавьте актив на вкладке «Рынки».</div>';
-  }else
-  $('#dashTopHoldings').innerHTML = sorted.map(h=>{
-    const val = h.qty*h.price;
-    const valRUB = h.currency==='USD'? val*FX.USD_RUB : val;
-    const pct = totalMetrics().totalValueRUB? (valRUB/totalMetrics().totalValueRUB*100):0;
-    const pnl = ((h.price-h.avgPrice)/h.avgPrice*100);
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
-      <div class="asset-cell"><div class="asset-icon" style="background:${h.color}">${h.icon}</div><div><div style="font-weight:600">${h.ticker}</div><div class="mini muted">${h.name}</div></div></div>
-      <div style="text-align:right"><div style="font-weight:700">${state.settings.showRUB? fmt(valRUB,'RUB'):fmt(val,'USD')}</div><div class="mini"><span class="pill ${pnl>=0?'pill-green':'pill-red'}" style="font-size:11px;padding:2px 6px">${fmtPct(pnl)}</span> <span class="muted">${pct.toFixed(1)}%</span></div></div>
-    </div>`;
-  }).join('');
+  if ($('#dashTopHoldings')) {
+    if(!sorted.length){
+      $('#dashTopHoldings').innerHTML = '<div class="empty"><div class="empty-icon">💼</div>Портфель пуст. Нажмите «Купить» вверху или добавьте актив на вкладке «Рынки».</div>';
+    }else
+    $('#dashTopHoldings').innerHTML = sorted.map(h=>{
+      const val = h.qty*h.price;
+      const valRUB = h.currency==='USD'? val*FX.USD_RUB : val;
+      const pct = totalMetrics().totalValueRUB? (valRUB/totalMetrics().totalValueRUB*100):0;
+      const pnl = ((h.price-h.avgPrice)/h.avgPrice*100);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+        <div class="asset-cell"><div class="asset-icon" style="background:${h.color}">${h.icon}</div><div><div style="font-weight:600">${h.ticker}</div><div class="mini muted">${h.name}</div></div></div>
+        <div style="text-align:right"><div style="font-weight:700">${state.settings.showRUB? fmt(valRUB,'RUB'):fmt(val,'USD')}</div><div class="mini"><span class="pill ${pnl>=0?'pill-green':'pill-red'}" style="font-size:11px;padding:2px 6px">${fmtPct(pnl)}</span> <span class="muted">${pct.toFixed(1)}%</span></div></div>
+      </div>`;
+    }).join('');
+  }
 
   // insights
   const insights = generateInsights();
-  $('#aiInsights').innerHTML = insights.map(ins=>`
-    <div style="display:flex;gap:12px;padding:12px;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);margin-bottom:10px">
-      <div style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;background:${ins.bg};color:${ins.color};font-size:18px">${ins.icon}</div>
-      <div><div style="font-weight:600;font-size:13px;margin-bottom:4px">${ins.title}</div><div class="mini muted" style="line-height:1.4">${ins.text}</div></div>
-    </div>
-  `).join('');
+  if ($('#aiInsights')) {
+    $('#aiInsights').innerHTML = insights.map(ins=>`
+      <div style="display:flex;gap:12px;padding:12px;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);margin-bottom:10px">
+        <div style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;background:${ins.bg};color:${ins.color};font-size:18px">${ins.icon}</div>
+        <div><div style="font-weight:600;font-size:13px;margin-bottom:4px">${ins.title}</div><div class="mini muted" style="line-height:1.4">${ins.text}</div></div>
+      </div>
+    `).join('');
+  }
 }
 
 function renderPortfolio(){
@@ -554,10 +566,10 @@ function renderWatchlist(){
 function renderAnalytics(){
   const m = totalMetrics();
   const div = calcDiversification();
-  $('#analyScore').textContent = div.score;
-  $('#analyLabel').textContent = div.label;
-  $('#analyDesc').textContent = div.desc;
-  $('#analyProgress').style.width = div.score+'%';
+  if ($('#analyScore')) $('#analyScore').textContent = div.score;
+  if ($('#analyLabel')) $('#analyLabel').textContent = div.label;
+  if ($('#analyDesc')) $('#analyDesc').textContent = div.desc;
+  if ($('#analyProgress')) $('#analyProgress').style.width = div.score+'%';
 
   // Sector breakdown
   const bySector={};
@@ -566,29 +578,33 @@ function renderAnalytics(){
     bySector[h.sector]=(bySector[h.sector]||0)+vRUB;
   });
   const total = Object.values(bySector).reduce((a,b)=>a+b,0);
-  if(!total){
-    $('#sectorBreakdown').innerHTML = '<div class="empty"><div class="empty-icon">🧩</div>Нет активов для анализа секторов.</div>';
-  }else
-  $('#sectorBreakdown').innerHTML = Object.entries(bySector).sort((a,b)=>b[1]-a[1]).map(([sec,val])=>{
-    const pct = total? val/total*100:0;
-    const info = SECTORS[sec]||{label:sec,color:'#888'};
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div style="width:10px;height:10px;border-radius:50%;background:${info.color}"></div><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:600">${info.label}</span><span class="mini muted">${pct.toFixed(1)}% • ${fmt(val,'RUB')}</span></div><div class="progress" style="margin-top:6px"><div class="progress-bar" style="width:${pct}%;background:${info.color}"></div></div></div></div>`;
-  }).join('');
+  if ($('#sectorBreakdown')) {
+    if(!total){
+      $('#sectorBreakdown').innerHTML = '<div class="empty"><div class="empty-icon">🧩</div>Нет активов для анализа секторов.</div>';
+    }else
+    $('#sectorBreakdown').innerHTML = Object.entries(bySector).sort((a,b)=>b[1]-a[1]).map(([sec,val])=>{
+      const pct = total? val/total*100:0;
+      const info = SECTORS[sec]||{label:sec,color:'#888'};
+      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div style="width:10px;height:10px;border-radius:50%;background:${info.color}"></div><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:600">${info.label}</span><span class="mini muted">${pct.toFixed(1)}% • ${fmt(val,'RUB')}</span></div><div class="progress" style="margin-top:6px"><div class="progress-bar" style="width:${pct}%;background:${info.color}"></div></div></div></div>`;
+    }).join('');
+  }
 
   // Recommendations
   const recs = generateRecommendations();
-  $('#recommendations').innerHTML = recs.map(r=>`
-    <div style="padding:14px;border-radius:12px;background:linear-gradient(135deg, ${r.gradient});border:1px solid ${r.border};margin-bottom:10px">
-      <div style="display:flex;gap:10px;align-items:flex-start"><div style="font-size:18px">${r.icon}</div><div><div style="font-weight:700;font-size:14px;margin-bottom:4px">${r.title}</div><div class="mini" style="line-height:1.5;opacity:0.85">${r.text}</div>${r.action? `<button class="btn btn-sm" data-rec-action="${r.action}" style="margin-top:10px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);cursor:pointer">${r.action}</button>`:''}</div></div>
-    </div>
-  `).join('');
+  if ($('#recommendations')) {
+    $('#recommendations').innerHTML = recs.map(r=>`
+      <div style="padding:14px;border-radius:12px;background:linear-gradient(135deg, ${r.gradient});border:1px solid ${r.border};margin-bottom:10px">
+        <div style="display:flex;gap:10px;align-items:flex-start"><div style="font-size:18px">${r.icon}</div><div><div style="font-weight:700;font-size:14px;margin-bottom:4px">${r.title}</div><div class="mini" style="line-height:1.5;opacity:0.85">${r.text}</div>${r.action? `<button class="btn btn-sm" data-rec-action="${r.action}" style="margin-top:10px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);cursor:pointer">${r.action}</button>`:''}</div></div>
+      </div>
+    `).join('');
+  }
 
   // risk
   const risk = calcRisk();
-  $('#riskValue').textContent = risk.value.toFixed(1)+'/10';
-  $('#riskPin').style.left = (risk.value*10)+'%';
-  $('#riskLabel').textContent = risk.label;
-  $('#riskDesc').textContent = risk.desc;
+  if ($('#riskValue')) $('#riskValue').textContent = risk.value.toFixed(1)+'/10';
+  if ($('#riskPin')) $('#riskPin').style.left = (risk.value*10)+'%';
+  if ($('#riskLabel')) $('#riskLabel').textContent = risk.label;
+  if ($('#riskDesc')) $('#riskDesc').textContent = risk.desc;
 }
 
 function calcDiversification(){
@@ -674,6 +690,23 @@ function generateInsights(){
 function generateRecommendations(){
   const m = totalMetrics();
   const recs=[];
+
+  // News & Polymarket recommendation boost
+  if (window.TINVEST_NEWS) {
+    const newsRecs = window.TINVEST_NEWS.getBaseRecommendations();
+    if (newsRecs.length > 0) {
+      const topNews = newsRecs[0];
+      recs.push({
+        icon: '📻',
+        title: `Сигнал: ${topNews.ticker} (${topNews.name})`,
+        text: `${topNews.reason}`,
+        gradient: 'rgba(79,124,255,0.14), rgba(79,124,255,0.05)',
+        border: 'rgba(79,124,255,0.25)',
+        action: `Купить ${topNews.ticker}`
+      });
+    }
+  }
+
   // cash
   const cashHolding = state.holdings.find(h=>h.ticker==='LQDT');
   const cashPct = (cashHolding && m.totalValueRUB)? (cashHolding.qty*cashHolding.price)/m.totalValueRUB*100:0;
@@ -1105,9 +1138,9 @@ function calcDCA(){
     total = (total + amount) * (1+monthlyRate);
   }
   const invested = amount*months;
-  $('#dcaResult').textContent = fmt(total,'RUB');
-  $('#dcaInvested').textContent = fmt(invested,'RUB');
-  $('#dcaProfit').textContent = fmt(total-invested,'RUB');
+  if ($('#dcaResult')) $('#dcaResult').textContent = fmt(total,'RUB');
+  if ($('#dcaInvested')) $('#dcaInvested').textContent = fmt(invested,'RUB');
+  if ($('#dcaProfit')) $('#dcaProfit').textContent = fmt(total-invested,'RUB');
 }
 
 function calcGoal(){
@@ -1117,7 +1150,7 @@ function calcGoal(){
   const rate = parseFloat($('#goalRate')?.value)||0;
   const r = rate/100/12;
   if(monthly<=0){
-    $('#goalResult').textContent = 'Укажите платеж';
+    if ($('#goalResult')) $('#goalResult').textContent = 'Укажите платеж';
     return;
   }
   let months=0, bal=current;
@@ -1125,13 +1158,13 @@ function calcGoal(){
     bal = bal*(1+r)+monthly;
     months++;
   }
-  if(months>=600) $('#goalResult').textContent='> 50 лет';
+  if(months>=600) { if ($('#goalResult')) $('#goalResult').textContent='> 50 лет'; }
   else{
     const years = Math.floor(months/12);
     const remM = months%12;
-    $('#goalResult').textContent = `${years>0? years+' г ':''}${remM} мес • ${fmt(bal,'RUB')}`;
+    if ($('#goalResult')) $('#goalResult').textContent = `${years>0? years+' г ':''}${remM} мес • ${fmt(bal,'RUB')}`;
   }
-  $('#goalMonths').textContent = months+' мес';
+  if ($('#goalMonths')) $('#goalMonths').textContent = months+' мес';
 }
 
 function addGoal(){
@@ -1311,7 +1344,7 @@ function showRebalance(){
 }
 
 // expose
-window.app={ toggleWatchlist, openBuyModal, showRebalance };
+window.app={ state, toast, toggleWatchlist, openBuyModal, showRebalance };
 
 if(document.readyState === 'loading'){
   document.addEventListener('DOMContentLoaded', init);
