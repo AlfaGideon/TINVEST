@@ -1,28 +1,34 @@
 const { MARKET, DEFAULT_HOLDINGS, FX, SECTORS, generateHistory } = window.TINVEST_DATA;
 
-const STORAGE_KEY = 'tinvest_v2';
+const STORAGE_KEY = 'tinvest_v3'; // bumped to drop old demo-data snapshots
 let state = loadState();
 
 function loadState(){
+  // Wipe legacy keys that contained baked-in demo holdings
+  ['tinvest_v1','tinvest_v2'].forEach(k => {
+    try { if(localStorage.getItem(k)) localStorage.removeItem(k); } catch(e){}
+  });
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
       return {
-        holdings: parsed.holdings || DEFAULT_HOLDINGS,
-        transactions: parsed.transactions || genTransactions(DEFAULT_HOLDINGS),
-        watchlist: parsed.watchlist || [],
-        goals: parsed.goals || [],
-        settings:{ currency:'RUB', showRUB:true }
+        profile: parsed.profile || { name: 'Инвестор' },
+        holdings: Array.isArray(parsed.holdings) ? parsed.holdings : [],
+        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+        watchlist: Array.isArray(parsed.watchlist) ? parsed.watchlist : [],
+        goals: Array.isArray(parsed.goals) ? parsed.goals : [],
+        settings: Object.assign({ currency:'RUB', showRUB:true }, parsed.settings || {})
       };
     }
   }catch(e){console.warn(e)}
   return {
-    holdings: JSON.parse(JSON.stringify(DEFAULT_HOLDINGS)),
-    transactions: genTransactions(DEFAULT_HOLDINGS),
-    watchlist:[],
-    goals:[],
-    settings:{ currency:'RUB', showRUB:true }
+    profile: { name: 'Инвестор' },
+    holdings: [],
+    transactions: [],
+    watchlist: [],
+    goals: [],
+    settings: { currency:'RUB', showRUB:true }
   };
 }
 
@@ -270,6 +276,8 @@ function bindEvents(){
 
 function renderAll(){
   const m = totalMetrics();
+  renderProfile();
+  renderSidebarLive();
   // topbar KPI
   $('#kpiTotal') && ($('#kpiTotal').textContent = state.settings.showRUB ? fmt(m.totalValueRUB,'RUB') : fmt(m.totalValueUSD,'USD'));
   $('#kpiPnL') && ($('#kpiPnL').textContent = (m.pnl>=0?'+':'')+fmt(m.pnl,'RUB'));
@@ -283,22 +291,78 @@ function renderAll(){
   renderAnalytics();
   renderGoals();
   renderWatchlist();
+  renderDividends();
+  renderStressTest();
   calcCompound();
   calcDCA();
   calcGoal();
+  perfHistory = null;
+  if(charts.perf){ try{ charts.perf.destroy(); }catch(e){} charts.perf=null; }
+  setTimeout(()=>renderPerfChart(document.querySelector('.tabs[data-tabs="perf"] .tab.active')?.dataset.tab || '1Y', true), 50);
+  setTimeout(()=>renderAllocChart(true), 80);
+}
+
+function renderProfile(){
+  const name = (state.profile && state.profile.name) || 'Инвестор';
+  const nameEl = $('#userName');
+  const subEl = $('#userSub');
+  const avEl = $('#userAvatar');
+  if(nameEl) nameEl.textContent = name;
+  if(avEl) avEl.textContent = (name.trim()[0] || 'И').toUpperCase();
+  const m = totalMetrics();
+  const sub = state.holdings.length
+    ? `${state.holdings.length} актив${state.holdings.length===1?'':(state.holdings.length<5?'а':'ов')} • ${fmt(m.totalValueRUB,'RUB')}`
+    : 'Локальный профиль • LocalStorage';
+  if(subEl) subEl.textContent = sub;
+}
+
+function renderSidebarLive(){
+  const usd = $('#sbUsd'), eur = $('#sbEur'), btc = $('#sbBtc');
+  const bar = $('#sbLiveBar'), lbl = $('#sbLiveLabel');
+  if(usd) usd.textContent = FX.USD_RUB ? FX.USD_RUB.toFixed(2)+' ₽' : '—';
+  if(eur) eur.textContent = FX.EUR_RUB ? FX.EUR_RUB.toFixed(2)+' ₽' : '—';
+  const btcItem = MARKET.find(m=>m.ticker==='BTC');
+  if(btc && btcItem){
+    btc.textContent = '$'+Math.round(btcItem.price).toLocaleString('ru-RU');
+    btc.style.color = btcItem.change>=0 ? '#22c55e' : '#ef4444';
+  }
+  if(bar) bar.style.width = '100%';
+  if(lbl) lbl.textContent = 'Онлайн • MOEX • Binance • ЦБ';
 }
 
 function renderDashboard(){
   const m = totalMetrics();
+  // Greeting
+  const name = (state.profile && state.profile.name) || 'Инвестор';
+  const hour = new Date().getHours();
+  const greet = hour<6?'Доброй ночи':(hour<12?'Доброе утро':(hour<18?'Добрый день':'Добрый вечер'));
+  const gT = $('#greetTitle'), gS = $('#greetSub');
+  if(gT) gT.textContent = `${greet}, ${name} 👋`;
+  if(gS){
+    if(!state.holdings.length){
+      gS.innerHTML = 'Портфель пока пуст. Нажмите <b style="color:var(--text)">«Купить»</b> вверху или откройте вкладку <b style="color:var(--text)">Рынки</b>, чтобы добавить первый актив.';
+    } else {
+      const diversification = calcDiversification();
+      const risk = calcRisk();
+      gS.innerHTML = `AI-коуч проанализировал портфель: <b style="color:var(--text)">диверсификация ${diversification.score}/100</b>, риск <b style="color:var(--text)">${risk.label.toLowerCase()}</b>. ${m.pnlPct>=0?'Портфель в плюсе.':'Портфель в просадке — держитесь.'}`;
+    }
+  }
+
   $('#dashTotal').textContent = state.settings.showRUB? fmt(m.totalValueRUB,'RUB'):fmt(m.totalValueUSD,'USD');
   $('#dashCost').textContent = fmt(m.totalCostRUB,'RUB');
   $('#dashPnlValue').textContent = fmt(m.pnl,'RUB');
   $('#dashPnlPct').textContent = fmtPct(m.pnlPct);
   $('#dashPnlPct').className = 'pill '+(m.pnlPct>=0?'pill-green':'pill-red');
   $('#dashCount').textContent = state.holdings.length+' активов';
+  // sectors/types breakdown
+  const sectors = new Set(state.holdings.map(h=>h.sector)).size;
+  const types = new Set(state.holdings.map(h=>h.type)).size;
+  const brk = $('#dashBreakdown');
+  if(brk) brk.textContent = `${sectors} сектор${sectors===1?'':(sectors<5?'а':'ов')} • ${types} класс${types===1?'':(types<5?'а':'ов')}`;
+
   const diversification = calcDiversification();
   $('#dashRiskScore').textContent = diversification.score+'/100';
-  $('#dashRiskLabel').textContent = diversification.label;
+  $('#dashRiskLabel').textContent = ' ' + diversification.label;
   $('#dashRiskBar').style.width = diversification.score+'%';
 
   // top holdings
@@ -563,19 +627,97 @@ function generateRecommendations(){
   return recs;
 }
 
+function renderDividends(){
+  const list = $('#dividendsList');
+  if(!list) return;
+  const divTickers = {
+    SBER: { yield: 0.11, date: 'ближ. в дек', per: 33.3 },
+    LKOH: { yield: 0.07, date: '2 раза/год', per: 450 },
+    TCSG: { yield: 0.04, date: 'годовые', per: 90 },
+    YDEX: { yield: 0, date: 'нет', per: 0 },
+    'SU26238': { yield: 0.12, date: 'купоны 4×/год', per: 35, bond: true },
+    VOO: { yield: 0.013, date: 'квартально', per: 1.65, usd: true },
+  };
+  const items = [];
+  state.holdings.forEach(h=>{
+    const t = divTickers[h.ticker];
+    if(!t || !t.per) return;
+    const income = h.qty * t.per;
+    const cur = t.usd ? 'USD' : 'RUB';
+    items.push({
+      ticker: h.ticker, name: h.name,
+      sub: t.date + (t.per ? ` • ${t.per} ${cur==='USD'?'$':'₽'}/шт` : ''),
+      amount: income, cur
+    });
+  });
+  if(!items.length){
+    list.innerHTML = '<div class="empty" style="padding:18px"><div class="empty-icon">💸</div>Пока нет активов с прогнозируемыми выплатами. Добавьте дивидендные акции или ОФЗ.</div>';
+    return;
+  }
+  list.innerHTML = items.map(it=>`
+    <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)">
+      <div><b>${it.ticker}</b><div class="mini muted">${it.sub}</div></div>
+      <b style="color:var(--green)">+${fmt(it.amount, it.cur)}/${it.cur==='USD'?'год':'год'}</b>
+    </div>`).join('');
+}
+
+function renderStressTest(){
+  const el = $('#stressTestList');
+  if(!el) return;
+  const m = totalMetrics();
+  if(!state.holdings.length || !m.totalValueRUB){
+    el.innerHTML = '<div class="mini muted">Добавьте активы, чтобы рассчитать сценарии.</div>';
+    return;
+  }
+  // Compute weights per asset class
+  const byType = {};
+  state.holdings.forEach(h=>{
+    const v = h.currency==='USD'? h.qty*h.price*FX.USD_RUB : h.qty*h.price;
+    byType[h.type] = (byType[h.type]||0) + v;
+  });
+  const tot = m.totalValueRUB || 1;
+  const stockW = (byType.stock||0)/tot;
+  const bondW  = (byType.bond||0)/tot + ((byType.etf||0)/tot)*0.3; // rough
+  const cashW  = (byType.cash||0)/tot;
+  const cryptoW= (byType.crypto||0)/tot;
+  const scenarios = [
+    { name:'Кризис 2008 (-50% акции, -30% crypto)', pct: -(stockW*50 + cryptoW*30 - bondW*5 - cashW*0) },
+    { name:'Ковид 2020 (-33% акции, -40% crypto)', pct: -(stockW*33 + cryptoW*40 - bondW*3 - cashW*0) },
+    { name:'Рост ставок +3%', pct: bondW*2 + cashW*1 - stockW*6 - cryptoW*8 },
+  ];
+  el.innerHTML = scenarios.map(s=>{
+    const neg = s.pct<0;
+    return `<div style="display:flex;justify-content:space-between;padding:10px;border-radius:10px;background:var(--bg2);border:1px solid var(--border)">
+      <span class="mini">${s.name}</span>
+      <span class="mini pill ${neg?'pill-red':'pill-green'}">${s.pct>=0?'+':''}${s.pct.toFixed(1)}% портфеля</span>
+    </div>`;
+  }).join('');
+}
+
 function renderGoals(){
   const grid = $('#goalsGrid');
+  const summary = $('#goalsSummary');
+  const saved = state.goals.reduce((s,g)=>s+(+g.current||0),0);
+  const target = state.goals.reduce((s,g)=>s+(+g.target||0),0);
+  if(summary){
+    if(!state.goals.length) summary.textContent = '0 целей';
+    else summary.textContent = `${state.goals.length} цел${state.goals.length===1?'ь':(state.goals.length<5?'и':'ей')} • ${fmt(saved,'RUB')} накоплено`;
+  }
   if(!grid) return;
+  if(!state.goals.length){
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;padding:40px"><div class="empty-icon">🎯</div>Целей пока нет. Создайте первую цель ниже.</div>';
+    return;
+  }
   grid.innerHTML = state.goals.map(g=>{
     const pct = Math.min(100, g.current/g.target*100);
     return `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="display:flex;gap:10px;align-items:center"><div style="width:42px;height:42px;border-radius:12px;background:var(--card2);border:1px solid var(--border);display:grid;place-items:center;font-size:20px">${g.icon}</div><div><div style="font-weight:700">${g.name}</div><div class="mini muted">до ${new Date(g.date).toLocaleDateString('ru-RU')}</div></div></div>
+        <div style="display:flex;gap:10px;align-items:center"><div style="width:42px;height:42px;border-radius:12px;background:var(--card2);border:1px solid var(--border);display:grid;place-items:center;font-size:20px">${g.icon||'🎯'}</div><div><div style="font-weight:700">${g.name}</div><div class="mini muted">до ${new Date(g.date||'2030-12-31').toLocaleDateString('ru-RU')}</div></div></div>
         <button class="btn-ghost btn-sm" style="border:1px solid var(--border)" data-del-goal="${g.id}">✕</button>
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="mini muted">${fmt(g.current,'RUB')}</span><span class="mini muted">${fmt(g.target,'RUB')}</span></div>
       <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px"><span class="pill pill-blue">${pct.toFixed(1)}%</span><span class="mini muted">Осталось ${fmt(g.target-g.current,'RUB')}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px"><span class="pill pill-blue">${pct.toFixed(1)}%</span><span class="mini muted">Осталось ${fmt(Math.max(0,g.target-g.current),'RUB')}</span></div>
     </div>`;
   }).join('');
 }
@@ -589,8 +731,28 @@ function renderPerfChart(range='1Y', force=false){
   const canvas = $('#perfChart');
   if(!canvas) return;
   if(charts.perf){ charts.perf.destroy(); charts.perf=null; }
+  const total = totalMetrics().totalValueRUB;
+  if(!total || !state.holdings.length){
+    // Empty-state flat line
+    const labels = ['','','','','','',''];
+    const zero = [0,0,0,0,0,0,0];
+    charts.perf = new Chart(canvas, {
+      type:'line',
+      data:{ labels, datasets:[
+        { label:'Портфель', data:zero, borderColor:'#4f7cff', borderDash:[4,4], borderWidth:2, pointRadius:0, tension:0 },
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'#5a6d95', font:{size:11}} },
+          y:{ grid:{color:'rgba(255,255,255,0.06)'}, ticks:{color:'#5a6d95', font:{size:11}, callback:()=>'0'} }
+        },
+        plugins:{ legend:{display:false}, tooltip:{enabled:false} }
+      }
+    });
+    return;
+  }
   if(!perfHistory){
-    const total = totalMetrics().totalValueRUB;
     perfHistory = {
       '1M': generateHistory(total, 1, 0.03, 0.015),
       '3M': generateHistory(total*0.92, 3, 0.04, 0.01),
@@ -599,7 +761,7 @@ function renderPerfChart(range='1Y', force=false){
     };
   }
   const hist = perfHistory[range] || perfHistory['1Y'];
-  // benchmark S&P
+  // benchmark IMOEX
   const benchData = hist.data.map((v,i)=> Math.round(v*(0.92 + i*0.002 + Math.sin(i)*0.01)));
 
   charts.perf = new Chart(canvas, {
@@ -671,37 +833,57 @@ function renderAnalyticCharts(){
   const c1 = $('#corrChart');
   if(charts.corr){ charts.corr.destroy(); charts.corr=null; }
   if(c1){
-    charts.corr = new Chart(c1, {
-      type:'bar',
-      data:{
-        labels: state.holdings.map(h=>h.ticker),
-        datasets:[{ label:'Корреляция с портфелем', data: state.holdings.map(()=> (Math.random()*0.4+0.5).toFixed(2)), backgroundColor:'#4f7cff', borderRadius:8 }]
-      },
-      options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ grid:{display:false}}, y:{ grid:{color:'rgba(255,255,255,0.06)'}, min:0, max:1 } }, plugins:{ legend:{display:false} } }
-    });
+    if(!state.holdings.length){
+      charts.corr = new Chart(c1, { type:'bar', data:{labels:[],datasets:[]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}} });
+    } else {
+      charts.corr = new Chart(c1, {
+        type:'bar',
+        data:{
+          labels: state.holdings.map(h=>h.ticker),
+          datasets:[{ label:'Корреляция с портфелем', data: state.holdings.map((_,i)=>{
+            // Deterministic pseudo-correlation per position instead of Math.random() flicker
+            const v = ((i*7919)%100)/100*0.4+0.5;
+            return +v.toFixed(2);
+          }), backgroundColor:'#4f7cff', borderRadius:8 }]
+        },
+        options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ grid:{display:false}}, y:{ grid:{color:'rgba(255,255,255,0.06)'}, min:0, max:1 } }, plugins:{ legend:{display:false} } }
+      });
+    }
   }
   const c2 = $('#growthChart');
   if(charts.growth){ charts.growth.destroy(); charts.growth=null; }
   if(c2){
-    const hist = generateHistory(totalMetrics().totalValueRUB, 36, 0.06, 0.009);
-    charts.growth = new Chart(c2, {
-      type:'line',
-      data:{ labels:hist.labels, datasets:[{ data:hist.data, borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.12)', fill:true, tension:0.4, borderWidth:2, pointRadius:0 }] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(255,255,255,0.06)'}}} }
-    });
+    const total = totalMetrics().totalValueRUB;
+    if(!total || !state.holdings.length){
+      charts.growth = new Chart(c2, { type:'line', data:{labels:[],datasets:[]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}} });
+    } else {
+      const hist = generateHistory(total*0.55, 36, 0.06, 0.009);
+      charts.growth = new Chart(c2, {
+        type:'line',
+        data:{ labels:hist.labels, datasets:[{ data:hist.data, borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.12)', fill:true, tension:0.4, borderWidth:2, pointRadius:0 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(255,255,255,0.06)'}}} }
+      });
+    }
   }
 }
 
 // Modals
 function openBuyModal(prefilled=null){
-  $('#buyModal').classList.add('open');
+  const modal = $('#buyModal');
+  if(!modal) return;
+  modal.classList.add('open');
+  const form = $('#holdingForm');
+  if(form) form.reset();
   if(prefilled){
-    $('#buyTicker').value = prefilled.ticker;
-    $('#buyName').value = prefilled.name;
-    $('#buyPrice').value = prefilled.price;
-    $('#buyCurrency').value = ['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT'].includes(prefilled.ticker) ? 'RUB':'USD';
+    $('#buyTicker').value = prefilled.ticker || '';
+    $('#buyName').value = prefilled.name || '';
+    $('#buyPrice').value = prefilled.price ?? '';
+    const isRu = ['SBER','YDEX','TCSG','LKOH','TMOS','SU26238','LQDT','GAZP','GMKN','ROSN','MAGN','NVTK','PLZL','SNGS','TATN','CHMF','IRAO','VTBR','ALRS','AFLT','HYDR','PIKK','DSKY','OZON','FIVE','POLY','RUAL','TRNFP','UPRO','PHOR'].includes(prefilled.ticker) || (prefilled.sector && prefilled.sector!=='crypto' && prefilled.cap && String(prefilled.cap).includes('RUB'));
+    $('#buyCurrency').value = isRu ? 'RUB':'USD';
+    // Focus qty
+    setTimeout(()=>$('#buyQty')?.focus(), 60);
   }else{
-    $('#holdingForm').reset();
+    setTimeout(()=>$('#buyTicker')?.focus(), 60);
   }
 }
 function closeModals(){
@@ -724,13 +906,24 @@ function handleBuySubmit(e){
     existing.qty = totalQty;
     existing.price = price; // update to last
   }else{
+    // Smart defaulting for custom tickers (not in MARKET)
+    let type = existingMarket.type || 'stock';
+    let sector = existingMarket.sector || 'tech';
+    let color = existingMarket.color || '#4f7cff';
+    let icon = existingMarket.icon || ticker.slice(0,2).toUpperCase();
+    if(!existingMarket.type){
+      if(/BTC|ETH|SOL|BNB|XRP|ADA|DOGE|DOT|AVAX|MATIC|LINK|LTC|TRX/.test(ticker)){ type='crypto'; sector='crypto'; color='#f97316'; }
+      else if(/ОФЗ|SU|OB|RU\d|OFZ/.test(ticker)){ type='bond'; sector='bond'; color='#0ea5e9'; }
+      else if(/ETF|TMOS|VOO|VEA|VWO|QQQ|SPY|IWM|DIA|ARK|FX[A-Z]/.test(ticker)){ type='etf'; sector='etf'; color='#8b5cf6'; }
+      else if(/LQDT|RMM|RUB/.test(ticker)){ type='etf'; sector='cash'; color='#64748b'; }
+      if(currency==='RUB'){
+        // russian tickers are usually cyrillic-like 4-5 letter latin codes (SBER, LKOH). Keep stock.
+      }
+    }
     state.holdings.push({
       id:'h_'+Math.random().toString(36).slice(2,9),
       ticker, name, qty, price, avgPrice:price, currency,
-      type: existingMarket.type || 'stock',
-      sector: existingMarket.sector || 'tech',
-      color: existingMarket.color || '#4f7cff',
-      icon: existingMarket.icon || ticker.slice(0,2)
+      type, sector, color, icon
     });
   }
   state.transactions.unshift({
@@ -834,8 +1027,22 @@ function importData(e){
   reader.onload = ev=>{
     try{
       const parsed = JSON.parse(ev.target.result);
-      if(parsed.holdings){ state=parsed; saveState(); renderAll(); toast('Импорт выполнен'); }
-    }catch(err){ alert('Ошибка файла'); }
+      if(parsed && Array.isArray(parsed.holdings)){
+        state = {
+          profile: parsed.profile || state.profile || { name:'Инвестор' },
+          holdings: parsed.holdings || [],
+          transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+          watchlist: Array.isArray(parsed.watchlist) ? parsed.watchlist : [],
+          goals: Array.isArray(parsed.goals) ? parsed.goals : [],
+          settings: Object.assign({ currency:'RUB', showRUB:true }, parsed.settings || {})
+        };
+        saveState(); perfHistory=null; renderAll();
+        toast('Импорт выполнен');
+      } else {
+        alert('Файл не содержит holdings');
+      }
+    }catch(err){ alert('Ошибка файла: '+err.message); }
+    e.target.value = '';
   };
   reader.readAsText(file);
 }

@@ -40,18 +40,22 @@
       <div class="nav-section">
         <div class="nav-label">Данные</div>
         <div class="card" style="padding:12px">
-          <div class="mini muted" style="margin-bottom:8px">Курсы ЦБ</div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600"><span>USD/RUB</span><span class="hl">92.40</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-top:4px"><span>BTC</span><span style="color:#22c55e">+3.21%</span></div>
-          <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:68%"></div></div>
-          <div class="mini muted" style="margin-top:6px">Автообновление (MOEX, Binance)</div>
+          <div class="mini muted" style="margin-bottom:8px">Курсы в реальном времени</div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600"><span>USD/RUB</span><span class="hl" id="sbUsd">—</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-top:4px"><span>EUR/RUB</span><span id="sbEur">—</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-top:4px"><span>BTC</span><span id="sbBtc" style="color:#22c55e">—</span></div>
+          <div class="progress" style="margin-top:10px"><div class="progress-bar" id="sbLiveBar" style="width:12%"></div></div>
+          <div class="mini muted" style="margin-top:6px" id="sbLiveLabel">Подключение к MOEX • Binance • ЦБ…</div>
         </div>
       </div>
     </nav>
     <div class="sidebar-bottom">
       <div class="user-card">
-        <div style="position:relative"><img src="https://i.pravatar.cc/100?img=32" alt="user"><div class="pulse" style="position:absolute;right:-2px;bottom:-2px"></div></div>
-        <div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Alex Investor</div><div class="mini muted" style="font-size:11px">Pro • ИИС-3 • Тинькофф ID</div></div>
+        <div style="position:relative"><div class="avatar-circle" id="userAvatar">И</div><div class="pulse" style="position:absolute;right:-2px;bottom:-2px"></div></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="userName">Инвестор</div>
+          <div class="mini muted" style="font-size:11px" id="userSub">Локальный профиль • LocalStorage</div>
+        </div>
         <button class="btn-icon" style="width:32px;height:32px" id="closeSidebar">✕</button>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
@@ -92,8 +96,8 @@
       <div class="view active" id="view-dashboard">
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:18px">
           <div>
-            <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.03em;line-height:1.1">Добро пожаловать, Alex 👋</h1>
-            <p class="muted" style="margin-top:6px;font-size:14px">Ваш AI-коуч проанализировал портфель: <b style="color:var(--text)">диверсификация 78/100</b>, риск умеренный. Рекомендует докупить облигации.</p>
+            <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.03em;line-height:1.1" id="greetTitle">Добро пожаловать 👋</h1>
+            <p class="muted" style="margin-top:6px;font-size:14px" id="greetSub">Загрузка портфеля…</p>
           </div>
           <div class="tabs" data-tabs="perf" style="margin:0">
             <button class="tab" data-tab="1M">1M</button>
@@ -106,7 +110,7 @@
         <div class="grid grid-4" style="margin-bottom:16px">
           <div class="card"><div class="kpi-label">💰 Общая стоимость</div><div class="kpi-value" id="dashTotal">—</div><div class="kpi-sub"><span class="pill pill-blue">Вложено <span id="dashCost">—</span></span></div><div class="glow" style="width:120px;height:120px;background:rgba(79,124,255,0.25);top:-20px;right:-20px"></div></div>
           <div class="card"><div class="kpi-label">📈 Прибыль</div><div class="kpi-value" id="dashPnlValue">—</div><div class="kpi-sub"><span id="dashPnlPct" class="pill pill-green">—</span> за всё время</div></div>
-          <div class="card"><div class="kpi-label">🧩 Активы</div><div class="kpi-value" id="dashCount">—</div><div class="kpi-sub"><span class="muted">5 секторов • 4 класса</span></div></div>
+          <div class="card"><div class="kpi-label">🧩 Активы</div><div class="kpi-value" id="dashCount">—</div><div class="kpi-sub"><span class="muted" id="dashBreakdown">— секторов • — классов</span></div></div>
           <div class="card"><div class="kpi-label">🛡️ Диверсификация</div><div class="kpi-value"><span id="dashRiskScore">—</span><span style="font-size:16px;color:var(--text3)" id="dashRiskLabel"></span></div><div style="margin-top:10px"><div class="progress"><div id="dashRiskBar" class="progress-bar" style="width:0%"></div></div></div></div>
         </div>
 
@@ -150,13 +154,11 @@
           </div>
           <div class="card">
             <h3 style="font-weight:700;margin-bottom:12px">Дивиденды и купоны (план)</h3>
-            <div style="display:grid;gap:10px">
-              <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)"><div><b>SBER</b><div class="mini muted">15 дек 2025 • 33.3 ₽/акция</div></div><b style="color:var(--green)">+3 996 ₽</b></div>
-              <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)"><div><b>ОФЗ 26238</b><div class="mini muted">Купоны • 4 раза/год</div></div><b style="color:var(--green)">+5 840 ₽/год</b></div>
-              <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)"><div><b>VOO</b><div class="mini muted">Квартально • 1.3% год</div></div><b style="color:var(--green)">+$42.1</b></div>
+            <div style="display:grid;gap:10px" id="dividendsList">
+              <div class="empty" style="padding:18px"><div class="empty-icon">💸</div>Пока нет активов с прогнозируемыми выплатами.</div>
             </div>
             <div class="card" style="margin-top:12px;background:linear-gradient(135deg, rgba(79,124,255,0.14), rgba(124,77,255,0.12));border-color:rgba(79,124,255,0.22)">
-              <div style="font-weight:700">💡 Совет по налогам</div><div class="mini muted" style="margin-top:4px;line-height:1.5">Держите активы >3 лет — освобождение от НДФЛ на доход до 9 млн ₽. Ваш LQDT и ОФЗ уже в льготной зоне.</div>
+              <div style="font-weight:700">💡 Совет по налогам</div><div class="mini muted" style="margin-top:4px;line-height:1.5">Держите активы более 3 лет — освобождение от НДФЛ на доход до 9 млн ₽. Для российских акций и ОФЗ действует льгота ИИС-3.</div>
             </div>
           </div>
         </div>
@@ -206,10 +208,8 @@
             <div class="mini muted" style="margin-top:12px;line-height:1.5" id="riskDesc"></div>
 
             <h4 style="font-weight:700;margin:16px 0 10px">Стресс-тест</h4>
-            <div style="display:grid;gap:8px">
-              <div style="display:flex;justify-content:space-between;padding:10px;border-radius:10px;background:var(--bg2);border:1px solid var(--border)"><span class="mini">Кризис 2008 (-50% акции)</span><span class="mini pill pill-red">-28% портфеля</span></div>
-              <div style="display:flex;justify-content:space-between;padding:10px;border-radius:10px;background:var(--bg2);border:1px solid var(--border)"><span class="mini">Ковид 2020 (-33%)</span><span class="mini pill pill-red">-14% портфеля</span></div>
-              <div style="display:flex;justify-content:space-between;padding:10px;border-radius:10px;background:var(--bg2);border:1px solid var(--border)"><span class="mini">Рост ставки (+3%)</span><span class="mini pill pill-green">+2% за счет ОФЗ</span></div>
+            <div style="display:grid;gap:8px" id="stressTestList">
+              <div class="mini muted">Добавьте активы, чтобы рассчитать сценарии.</div>
             </div>
           </div>
         </div>
@@ -256,7 +256,7 @@
 
       <!-- GOALS -->
       <div class="view" id="view-goals">
-        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px"><h1 style="font-size:24px;font-weight:800">Финансовые цели</h1><span class="pill pill-blue">3 цели • 2.87 млн ₽ накоплено</span></div>
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px"><h1 style="font-size:24px;font-weight:800">Финансовые цели</h1><span class="pill pill-blue" id="goalsSummary">0 целей</span></div>
         <div class="grid grid-3" id="goalsGrid"></div>
         <div class="card" style="margin-top:16px">
           <h3 style="font-weight:700;margin-bottom:12px">+ Новая цель</h3>
@@ -268,7 +268,7 @@
     </div>
 
     <footer style="padding:18px 28px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;font-size:12px;color:var(--text3)">
-      <span>© 2025 TINVEST • AI Portfolio OS • Демо-данные. Не является инвестсоветом. <a href="https://github.com/AlfaGideon/TINVEST" style="color:var(--text2);text-decoration:underline">GitHub</a></span>
+      <span>© 2026 TINVEST • AI Portfolio OS • Работает с вашими данными. Не является инвестсоветом. <a href="https://github.com/AlfaGideon/TINVEST" style="color:var(--text2);text-decoration:underline">GitHub</a></span>
       <span style="display:flex;gap:12px"><span>🔒 LocalStorage only</span><span>⚡ PWA ready</span><span>📊 Chart.js</span></span>
     </footer>
   </main>
