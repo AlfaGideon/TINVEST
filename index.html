@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TINVEST — Умная инвестиционная платформа</title>
+<meta name="description" content="TINVEST — профессиональный трекер портфеля, AI-аналитика, ребалансировка и калькуляторы. Работает прямо в браузере.">
+<meta name="theme-color" content="#0a0e14">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/style.css">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f7cff'/><path d='M9 22L14 10l3 8 6-8v12H9z' fill='white'/></svg>">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <div class="logo">
+        <div class="logo-icon">T</div>
+        <div>TINVEST<small>AI • PORTFOLIO OS</small></div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">
+        <div class="nav-label">Основное</div>
+        <a class="nav-item active" data-view="dashboard" href="#"><span>📊</span> Дашборд <span class="badge">Live</span></a>
+        <a class="nav-item" data-view="portfolio" href="#"><span>💼</span> Портфель</a>
+        <a class="nav-item" data-view="markets" href="#"><span>📈</span> Рынки</a>
+        <a class="nav-item" data-view="analytics" href="#"><span>🧠</span> AI Аналитика</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Планирование</div>
+        <a class="nav-item" data-view="calculators" href="#"><span>🧮</span> Калькуляторы</a>
+        <a class="nav-item" data-view="goals" href="#"><span>🎯</span> Цели <span class="badge" style="background:#1e2d4a;color:#92a0bd;border:1px solid #25385c">3</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Данные</div>
+        <div class="card" style="padding:12px">
+          <div class="mini muted" style="margin-bottom:8px">Курсы ЦБ</div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600"><span>USD/RUB</span><span class="hl">92.40</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-top:4px"><span>BTC</span><span style="color:#22c55e">+3.21%</span></div>
+          <div class="progress" style="margin-top:10px"><div class="progress-bar" style="width:68%"></div></div>
+          <div class="mini muted" style="margin-top:6px">Автообновление • Demo</div>
+        </div>
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="user-card">
+        <div style="position:relative"><img src="https://i.pravatar.cc/100?img=32" alt="user"><div class="pulse" style="position:absolute;right:-2px;bottom:-2px"></div></div>
+        <div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Alex Investor</div><div class="mini muted" style="font-size:11px">Pro • ИИС-3 • Тинькофф ID</div></div>
+        <button class="btn-icon" style="width:32px;height:32px" id="closeSidebar">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn-ghost btn-sm" style="flex:1" id="exportBtn">Экспорт</button>
+        <button class="btn-ghost btn-sm" style="flex:1" id="importBtn">Импорт</button>
+        <input type="file" id="importFile" accept=".json" style="display:none">
+      </div>
+      <button class="btn-ghost btn-sm" style="width:100%;margin-top:8px;border:1px dashed var(--border);color:var(--text3)" id="resetBtn">Сбросить демо</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="hamburger">☰</button>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="muted mini" style="font-weight:700;letter-spacing:0.08em;text-transform:uppercase">Portfolio value</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-weight:800;font-size:18px;letter-spacing:-0.02em" id="kpiTotal">—</div>
+            <span class="pill pill-green" id="kpiPnL">—</span>
+            <span class="pill pill-green" id="kpiPct">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="search-box" style="margin-left:16px">
+        <span class="muted">⌕</span>
+        <input id="searchInput" placeholder="Поиск: NVDA, SBER, BTC, ОФЗ...">
+      </div>
+      <div class="topbar-actions">
+        <button class="btn-icon" id="currencyToggle" title="Переключить валюту">₽/$</button>
+        <button class="btn-icon">🔔</button>
+        <button class="btn btn-primary" id="btnAddHolding"><span>+</span> Купить</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- DASHBOARD -->
+      <div class="view active" id="view-dashboard">
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:18px">
+          <div>
+            <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.03em;line-height:1.1">Добро пожаловать, Alex 👋</h1>
+            <p class="muted" style="margin-top:6px;font-size:14px">Ваш AI-коуч проанализировал портфель: <b style="color:var(--text)">диверсификация 78/100</b>, риск умеренный. Рекомендует докупить облигации.</p>
+          </div>
+          <div class="tabs" data-tabs="perf" style="margin:0">
+            <button class="tab" data-tab="1M">1M</button>
+            <button class="tab" data-tab="3M">3M</button>
+            <button class="tab active" data-tab="1Y">1Y</button>
+            <button class="tab" data-tab="ALL">ALL</button>
+          </div>
+        </div>
+
+        <div class="grid grid-4" style="margin-bottom:16px">
+          <div class="card"><div class="kpi-label">💰 Общая стоимость</div><div class="kpi-value" id="dashTotal">—</div><div class="kpi-sub"><span class="pill pill-blue">Вложено <span id="dashCost">—</span></span></div><div class="glow" style="width:120px;height:120px;background:rgba(79,124,255,0.25);top:-20px;right:-20px"></div></div>
+          <div class="card"><div class="kpi-label">📈 Прибыль</div><div class="kpi-value" id="dashPnlValue">—</div><div class="kpi-sub"><span id="dashPnlPct" class="pill pill-green">—</span> за всё время</div></div>
+          <div class="card"><div class="kpi-label">🧩 Активы</div><div class="kpi-value" id="dashCount">—</div><div class="kpi-sub"><span class="muted">5 секторов • 4 класса</span></div></div>
+          <div class="card"><div class="kpi-label">🛡️ Диверсификация</div><div class="kpi-value"><span id="dashRiskScore">—</span><span style="font-size:16px;color:var(--text3)" id="dashRiskLabel"></span></div><div style="margin-top:10px"><div class="progress"><div id="dashRiskBar" class="progress-bar" style="width:0%"></div></div></div></div>
+        </div>
+
+        <div class="grid grid-3">
+          <div class="card" style="grid-column:span 2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="font-weight:700">Динамика капитала</h3><span class="mini pill pill-blue">vs IMOEX</span></div>
+            <div class="chart-wrap"><canvas id="perfChart"></canvas></div>
+          </div>
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:12px">Аллокация</h3>
+            <div class="chart-wrap sm"><canvas id="allocChart"></canvas></div>
+            <div class="chips" style="margin-top:12px"><span class="chip active">По классу</span><span class="chip">По секторам</span><span class="chip">По валюте</span></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:16px">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="font-weight:700">Топ холдинги</h3><a href="#" class="mini muted" data-view-link="portfolio">Весь портфель →</a></div>
+            <div id="dashTopHoldings">—</div>
+          </div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="font-weight:700">🧠 AI Insights</h3><span class="pill pill-blue">Обновлено сейчас</span></div>
+            <div id="aiInsights"></div>
+            <button class="btn btn-ghost" style="width:100%;margin-top:8px" data-view-trigger="analytics">Открыть аналитику →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PORTFOLIO -->
+      <div class="view" id="view-portfolio">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px">
+          <h1 style="font-size:24px;font-weight:800">Портфель</h1>
+          <div style="display:flex;gap:8px"><button class="btn btn-ghost" id="btnAddHolding2">+ Сделка</button><button class="btn btn-primary">Ребалансировать</button></div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Актив</th><th>Тип</th><th>Кол-во</th><th>Средняя → Цена</th><th>Стоимость • Вес</th><th>P&L</th><th></th></tr></thead><tbody id="holdingsTableBody"></tbody></table></div>
+
+        <div class="grid grid-2" style="margin-top:16px">
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:12px">История операций</h3>
+            <div class="table-wrap"><table><thead><tr><th>Дата</th><th>Тикер • Тип</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead><tbody id="txTableBody"></tbody></table></div>
+          </div>
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:12px">Дивиденды и купоны (план)</h3>
+            <div style="display:grid;gap:10px">
+              <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)"><div><b>SBER</b><div class="mini muted">15 дек 2025 • 33.3 ₽/акция</div></div><b style="color:var(--green)">+3 996 ₽</b></div>
+              <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)"><div><b>ОФЗ 26238</b><div class="mini muted">Купоны • 4 раза/год</div></div><b style="color:var(--green)">+5 840 ₽/год</b></div>
+              <div style="display:flex;justify-content:space-between;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border)"><div><b>VOO</b><div class="mini muted">Квартально • 1.3% год</div></div><b style="color:var(--green)">+$42.1</b></div>
+            </div>
+            <div class="card" style="margin-top:12px;background:linear-gradient(135deg, rgba(79,124,255,0.14), rgba(124,77,255,0.12));border-color:rgba(79,124,255,0.22)">
+              <div style="font-weight:700">💡 Совет по налогам</div><div class="mini muted" style="margin-top:4px;line-height:1.5">Держите активы >3 лет — освобождение от НДФЛ на доход до 9 млн ₽. Ваш LQDT и ОФЗ уже в льготной зоне.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MARKETS -->
+      <div class="view" id="view-markets">
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px">
+          <h1 style="font-size:24px;font-weight:800">Рынки</h1>
+          <div class="tabs" data-tabs="markets"><button class="tab active" data-tab="all">Все</button><button class="tab" data-tab="stock">Акции</button><button class="tab" data-tab="etf">ETF</button><button class="tab" data-tab="crypto">Крипта</button><button class="tab" data-tab="bond">Облигации</button></div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:16px"><table id="marketsTable"><thead><tr><th>Инструмент</th><th>Сектор</th><th>Цена • Изм</th><th>Капа</th><th>Действие</th></tr></thead><tbody id="marketsTableBody"></tbody></table></div>
+        <h3 style="font-weight:700;margin-bottom:10px">⭐ Избранное</h3>
+        <div class="grid grid-4" id="watchlistGrid"></div>
+      </div>
+
+      <!-- ANALYTICS -->
+      <div class="view" id="view-analytics">
+        <h1 style="font-size:24px;font-weight:800;margin-bottom:6px">🧠 AI Аналитика и риски</h1>
+        <p class="muted" style="margin-bottom:18px">Модели анализируют вашу диверсификацию, корреляции и стресс-тесты на истории 10 лет.</p>
+
+        <div class="grid grid-3">
+          <div class="card">
+            <div class="kpi-label">Score</div>
+            <div class="kpi-value" style="font-size:40px"><span id="analyScore">—</span><span style="font-size:18px;color:var(--text3)">/100</span></div>
+            <div class="kpi-sub" id="analyLabel">—</div>
+            <div class="progress" style="margin:14px 0 8px"><div id="analyProgress" class="progress-bar" style="width:0%"></div></div>
+            <div class="mini muted" id="analyDesc"></div>
+          </div>
+          <div class="card" style="grid-column:span 2">
+            <h3 style="font-weight:700;margin-bottom:12px">Аллокация по секторам</h3>
+            <div id="sectorBreakdown"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:16px">
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:12px">Корреляция активов</h3>
+            <div class="chart-wrap sm"><canvas id="corrChart"></canvas></div>
+            <div class="mini muted" style="margin-top:10px">Низкая корреляция ( <0.5 ) снижает риск просадки.</div>
+          </div>
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:12px">Уровень риска</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-weight:700" id="riskValue">—</span><span class="pill pill-blue" id="riskLabel">—</span></div>
+            <div class="risk-meter"><div id="riskPin" class="risk-pin"></div></div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text3)"><span>Консервативный</span><span>Агрессивный</span></div>
+            <div class="mini muted" style="margin-top:12px;line-height:1.5" id="riskDesc"></div>
+
+            <h4 style="font-weight:700;margin:16px 0 10px">Стресс-тест</h4>
+            <div style="display:grid;gap:8px">
+              <div style="display:flex;justify-content:space-between;padding:10px;border-radius:10px;background:var(--bg2);border:1px solid var(--border)"><span class="mini">Кризис 2008 (-50% акции)</span><span class="mini pill pill-red">-28% портфеля</span></div>
+              <div style="display:flex;justify-content:space-between;padding:10px;border-radius:10px;background:var(--bg2);border:1px solid var(--border)"><span class="mini">Ковид 2020 (-33%)</span><span class="mini pill pill-red">-14% портфеля</span></div>
+              <div style="display:flex;justify-content:space-between;padding:10px;border-radius:10px;background:var(--bg2);border:1px solid var(--border)"><span class="mini">Рост ставки (+3%)</span><span class="mini pill pill-green">+2% за счет ОФЗ</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:16px">
+          <div class="card"><h3 style="font-weight:700;margin-bottom:12px">История роста</h3><div class="chart-wrap sm"><canvas id="growthChart"></canvas></div></div>
+          <div class="card"><h3 style="font-weight:700;margin-bottom:12px">Рекомендации AI</h3><div id="recommendations"></div></div>
+        </div>
+      </div>
+
+      <!-- CALCULATORS -->
+      <div class="view" id="view-calculators">
+        <h1 style="font-size:24px;font-weight:800;margin-bottom:14px">Калькуляторы</h1>
+        <div class="grid grid-3">
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:4px">📈 Сложный процент</h3><p class="mini muted" style="margin-bottom:14px">Сколько вырастет капитал с реинвестом</p>
+            <div style="display:grid;gap:10px">
+              <div><label class="mini muted">Начальный капитал</label><input id="compoundInitial" class="input input-sm" type="number" value="500000"></div>
+              <div><label class="mini muted">В месяц</label><input id="compoundMonthly" class="input input-sm" type="number" value="30000"></div>
+              <div class="form-row"><div><label class="mini muted">Лет</label><input id="compoundYears" class="input input-sm" type="number" value="10"></div><div><label class="mini muted">Ставка % годовых</label><input id="compoundRate" class="input input-sm" type="number" value="14"></div></div>
+              <div style="padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border);margin-top:6px"><div class="mini muted">Итог</div><div style="font-size:22px;font-weight:800" id="compoundResult">—</div><div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap"><span class="mini pill" style="background:rgba(255,255,255,0.06)">Вложено: <span id="compoundInvested">—</span></span><span class="mini pill pill-green">Прибыль: <span id="compoundProfit">—</span> (<span id="compoundProfitPct">—</span>)</span></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:4px">💵 DCA калькулятор</h3><p class="mini muted" style="margin-bottom:14px">Регулярные покупки независимо от цены</p>
+            <div style="display:grid;gap:10px">
+              <div><label class="mini muted">Ежемесячная покупка</label><input id="dcaAmount" class="input input-sm" type="number" value="20000"></div>
+              <div class="form-row"><div><label class="mini muted">Месяцев</label><input id="dcaMonths" class="input input-sm" type="number" value="60"></div><div><label class="mini muted">Рост в год, %</label><input id="dcaGrowth" class="input input-sm" type="number" value="12"></div></div>
+              <div style="padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border);margin-top:6px"><div class="mini muted">Результат</div><div style="font-size:22px;font-weight:800" id="dcaResult">—</div><div class="mini muted" style="margin-top:6px">Вложено <span id="dcaInvested">—</span> • Прибыль <span id="dcaProfit" style="color:var(--green)">—</span></div></div>
+              <div class="mini muted" style="line-height:1.4">DCA снижает риск покупки на хаях. Исторически дает +2–4% к lump-sum на волатильных рынках.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:4px">🎯 Калькулятор цели</h3><p class="mini muted" style="margin-bottom:14px">Когда достигну цели?</p>
+            <div style="display:grid;gap:10px">
+              <div><label class="mini muted">Цель, ₽</label><input id="goalTarget" class="input input-sm" type="number" value="8000000"></div>
+              <div><label class="mini muted">Сейчас есть, ₽</label><input id="goalCurrent" class="input input-sm" type="number" value="1200000"></div>
+              <div class="form-row"><div><label class="mini muted">Платеж/мес</label><input id="goalMonthly" class="input input-sm" type="number" value="40000"></div><div><label class="mini muted">Доходность %</label><input id="goalRate" class="input input-sm" type="number" value="12"></div></div>
+              <div style="padding:12px;border-radius:12px;background:linear-gradient(135deg, rgba(79,124,255,0.14), rgba(124,77,255,0.12));border:1px solid rgba(79,124,255,0.22);margin-top:6px"><div class="mini muted">Достигнете через</div><div style="font-size:20px;font-weight:800" id="goalResult">—</div><div class="mini muted" id="goalMonths"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GOALS -->
+      <div class="view" id="view-goals">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px"><h1 style="font-size:24px;font-weight:800">Финансовые цели</h1><span class="pill pill-blue">3 цели • 2.87 млн ₽ накоплено</span></div>
+        <div class="grid grid-3" id="goalsGrid"></div>
+        <div class="card" style="margin-top:16px">
+          <h3 style="font-weight:700;margin-bottom:12px">+ Новая цель</h3>
+          <div class="form-row"><div><label class="mini muted">Название</label><input id="newGoalName" class="input" placeholder="Напр. На квартиру"></div><div><label class="mini muted">Дата</label><input id="newGoalDate" class="input" type="date"></div></div>
+          <div class="form-row" style="margin-top:10px"><div><label class="mini muted">Цель, ₽</label><input id="newGoalTarget" class="input" type="number" placeholder="8000000"></div><div><label class="mini muted">Уже есть, ₽</label><input id="newGoalCurrent" class="input" type="number" placeholder="500000"></div></div>
+          <div style="margin-top:12px;display:flex;justify-content:flex-end"><button class="btn btn-primary" id="addGoalBtn">Добавить цель</button></div>
+        </div>
+      </div>
+    </div>
+
+    <footer style="padding:18px 28px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;font-size:12px;color:var(--text3)">
+      <span>© 2025 TINVEST • AI Portfolio OS • Демо-данные. Не является инвестсоветом. <a href="https://github.com/AlfaGideon/TINVEST" style="color:var(--text2);text-decoration:underline">GitHub</a></span>
+      <span style="display:flex;gap:12px"><span>🔒 LocalStorage only</span><span>⚡ PWA ready</span><span>📊 Chart.js</span></span>
+    </footer>
+  </main>
+</div>
+
+<!-- BUY MODAL -->
+<div class="modal-overlay" id="buyModal">
+  <div class="modal">
+    <div class="modal-head"><h3 style="font-weight:800">Купить актив</h3><button class="btn-icon" style="width:32px;height:32px" data-close-modal>✕</button></div>
+    <form id="holdingForm">
+      <div class="modal-body" style="display:grid;gap:12px">
+        <div class="form-row"><div><label class="mini muted">Тикер</label><input id="buyTicker" class="input" placeholder="NVDA" required style="text-transform:uppercase"></div><div><label class="mini muted">Валюта</label><select id="buyCurrency" class="input"><option value="RUB">RUB ₽</option><option value="USD">USD $</option><option value="EUR">EUR €</option></select></div></div>
+        <div><label class="mini muted">Название</label><input id="buyName" class="input" placeholder="NVIDIA Corp"></div>
+        <div class="form-row"><div><label class="mini muted">Количество</label><input id="buyQty" class="input" type="number" step="any" min="0.0001" placeholder="10" required></div><div><label class="mini muted">Цена</label><input id="buyPrice" class="input" type="number" step="any" min="0.01" placeholder="185.3" required></div></div>
+        <div class="mini muted" style="padding:10px;border-radius:10px;background:rgba(79,124,255,0.08);border:1px solid rgba(79,124,255,0.18)">Данные хранятся только в вашем браузере (localStorage). Позже подключим брокерский API (Тинькофф, Alor).</div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn btn-ghost" data-close-modal>Отмена</button><button type="submit" class="btn btn-primary">Купить • Добавить в портфель</button></div>
+    </form>
+  </div>
+</div>
+
+<script type="module" src="./assets/js/app.js"></script>
+<script>
+// small helpers for links
+document.addEventListener('click', (e)=>{
+  const link = e.target.closest('[data-view-link]');
+  if(link){
+    e.preventDefault();
+    const view = link.getAttribute('data-view-link');
+    document.querySelector(`.nav-item[data-view="${view}"]`)?.click();
+  }
+  const trig = e.target.closest('[data-view-trigger]');
+  if(trig){
+    e.preventDefault();
+    const view = trig.getAttribute('data-view-trigger');
+    document.querySelector(`.nav-item[data-view="${view}"]`)?.click();
+  }
+});
+</script>
+</body>
+</html>
