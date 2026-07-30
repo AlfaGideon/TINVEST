@@ -86,7 +86,7 @@ function totalMetrics(){
 }
 
 function fmt(n, cur='RUB'){
-  if(cur==='RUB') return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:0}).format(n);
+  if(cur==='RUB') return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
   if(cur==='USD') return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
   if(cur==='EUR') return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n);
   return new Intl.NumberFormat('ru-RU').format(n);
@@ -108,6 +108,9 @@ function init(){
   renderAll();
   updateLivePrices();
   updateFX();
+  // Keep market quotes current while the app is open. MOEX/Binance are
+  // queried every 10 seconds; failed requests leave the last known quote intact.
+  setInterval(() => updateLivePrices(), 10000);
   // Chartjs
   if(window.Chart){
     Chart.defaults.color='#92a0bd';
