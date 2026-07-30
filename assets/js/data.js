@@ -1,4 +1,4 @@
-export export const FX = { USD_RUB: 92.4, EUR_RUB: 100.2 };
+export const FX = { USD_RUB: 92.4, EUR_RUB: 100.2 };
 
 export const SECTORS = {
   tech: { label: 'Технологии', color: '#4f7cff' },
